@@ -1,0 +1,5 @@
+.zsh_sessions
+.zsh_history
+config/aerc/accounts.conf
+config/aerc/keymap.map
+config/git/config

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+set -eou pipefail
+
+# Check if an argument is passed
+STATUS_FLAG=""
+if [[ $# -gt 0 ]]; then
+    STATUS_FLAG="--status $1"
+fi
+
+jira issue list \
+    -a$(jira me) \
+    --plain \
+    --columns id,summary,status $STATUS_FLAG |  # Conditionally include the status flag with argument
+    fzf \
+        --layout=reverse \
+        --header-lines=1 \
+        --preview-window 'bottom:80%:wrap' \
+        --preview 'jira issue view {1}' \
+        --bind 'alt-p:toggle-preview' \
+        --bind='alt-b:preview-up' \
+        --bind='alt-f:preview-down' \
+        --bind 'alt-e:execute(jira issue edit {1})' \
+        --bind 'alt-o:become(jira open {1})' \
+        --bind 'alt-u:become(jira open --no-browser {1} | pbcopy)' \
+        --bind "alt-y:become[jira open --no-browser {1} | awk -F/ '{print \$NF}' | pbcopy ]" \
+        --bind 'alt-m:execute(jira issue move {1})' \
+        --bind 'alt-c:execute(nvim /tmp/jira_comment.md -c "set ft=markdown" && jira issue comment add {1} < /tmp/jira_comment.md && rm /tmp/jira_comment.md)'

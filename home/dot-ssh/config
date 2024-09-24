@@ -1,0 +1,6 @@
+# Enable SSH agent and add keys to agent
+Host *
+  AddKeysToAgent yes
+
+# Include additional SSH configuration
+Include ~/.colima/ssh_config

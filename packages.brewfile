@@ -1,0 +1,61 @@
+# Brewfile
+
+# Formulae
+brew "aerc"
+brew "awscli"
+brew "bat"
+brew "btop"
+brew "colima"
+brew "coreutils"
+brew "difftastic"
+brew "docker"
+brew "docker-compose"
+brew "dockutil"
+brew "flyway"
+brew "freetds"
+brew "fzf"
+brew "gh"
+brew "git"
+brew "git-absorb"
+brew "helm"
+brew "kind"
+brew "kubectl"
+brew "lazygit"
+brew "libpq"
+brew "mise"
+brew "nvim"
+brew "powerlevel10k"
+brew "ripgrep"
+brew "sqlcmd"
+brew "stow"
+brew "tilt"
+brew "tree"
+brew "unixodbc"
+brew "vivid" # Colorizer for LS_COLORS
+brew "wget"
+brew "zellij"
+brew "zip"
+brew "zsh-autosuggestions"
+brew "zsh-syntax-highlighting"
+
+# Casks
+cask "arc"
+cask "alacritty"
+cask "bruno"
+cask "font-codicon"
+cask "hyperkey"
+cask "iina"
+cask "quarto"
+cask "raycast"
+cask "visual-studio-code"
+cask "wezterm"
+
+# Nerd Fonts
+cask "font-meslo-lg-nerd-font"
+
+# Custom Taps
+tap "koekeishiya/formulae"
+
+brew "koekeishiya/formulae/skhd"
+brew "koekeishiya/formulae/yabai"
+

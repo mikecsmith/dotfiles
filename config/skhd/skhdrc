@@ -1,0 +1,53 @@
+# change window focus within space
+alt - down : yabai -m window --focus south
+alt - up : yabai -m window --focus north
+alt - left : yabai -m window --focus west
+alt - right : yabai -m window --focus east
+
+# rotate layout clockwise
+hyper - r : yabai -m space --rotate 270
+
+# flip along y axis
+hyper - y : yabai -m space --mirror y-axis
+
+# flip along x axis
+hyper - x : yabai -m space --mirror x-axis
+
+# toggle float
+hyper - t : yabai -m window --toggle float
+
+# maximize window
+hyper - m : yabai -m space --toggle zoom-fullscreen
+
+# balance out tree of windows (resize to occupy same space)
+hyper - e : yabai -m space --balance
+
+# swap windows
+hyper - down : yabai -m window --swap south
+hyper - up : yabai -m window --swap north
+hyper - left : yabai -m window --swap west
+hyper - right : yabai -m window --swap east
+
+# move window and split
+ctrl + alt - down : yabai -m window --warp south;
+ctrl + alt - up : yabai -m window --warp north;
+ctrl + alt - left : yabai -m window --warp west;
+ctrl + alt - right : yabai -m window --warp east;
+
+# move window to prev and next space
+hyper - p : yabai -m window --space prev;
+hyper - n : yabai -m window --space next;
+
+# move window to space
+hyper - 1 : yabai -m window --space 1;
+hyper - 2 : yabai -m window --space 2;
+hyper - 3 : yabai -m window --space 3;
+hyper - 4 : yabai -m window --space 4;
+hyper - 5 : yabai -m window --space 5;
+hyper - 6 : yabai -m window --space 6;
+hyper - 7 : yabai -m window --space 7;
+
+# stop/star/restart yabai
+hyper - q : yabai --stop-service
+hyper - s : yabai --start-service
+hyper - r : yabai --restart-service

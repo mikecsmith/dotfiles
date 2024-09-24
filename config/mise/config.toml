@@ -1,0 +1,19 @@
+[tools]
+# global tool versions go here
+
+go = '1.22'
+gradle = '8.9'
+java = "corretto-21"
+julia = 'latest'
+kotlin = '2.0.20'
+quarkus = '3.14.1'
+node = 'lts'
+python = 'latest'
+scala = 'latest'
+
+[settings]
+
+legacy_version_file = true
+
+always_keep_download = false # deletes downloads after install
+always_keep_install = false # deletes an install on a failure
