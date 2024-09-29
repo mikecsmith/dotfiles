@@ -3,3 +3,4 @@
 config/aerc/accounts.conf
 config/aerc/keymap.map
 config/git/config
+config/nvim-old
