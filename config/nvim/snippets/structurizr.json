@@ -1,0 +1,372 @@
+{
+  "workspace": {
+    "prefix": "workspace",
+    "body": [
+      "workspace \"${1:name}\" \"${2:description}\" {",
+      "\t${3}",
+      "}"
+    ],
+    "description": "Snippet for defining a workspace"
+  },
+  "views": {
+    "prefix": "views",
+    "body": [
+      "views {",
+      "\t${1}",
+      "}"
+    ],
+    "description": "Snippet for defining views"
+  },
+  "model": {
+    "prefix": "model",
+    "body": [
+      "model {",
+      "\t${1}",
+      "}"
+    ],
+    "description": "Snippet for defining a model"
+  },
+  "group": {
+    "prefix": "group",
+    "body": [
+      "group \"${1:name}\" {",
+      "\t${2}",
+      "}"
+    ],
+    "description": "Snippet for defining a group"
+  },
+  "person": {
+    "prefix": "person",
+    "body": [
+      "${1:identifier} = person \"${2:name}\" \"${3:description}\" \"${4:tags}\""
+    ],
+    "description": "Snippet for defining a person"
+  },
+  "softwareSystem": {
+    "prefix": "softwareSystem",
+    "body": [
+      "${1:identifier} = softwareSystem \"${2:name}\" \"${3:description}\" \"${4:tags}\" {",
+      "\t${5}",
+      "}"
+    ],
+    "description": "Snippet for defining a software system"
+  },
+  "container": {
+    "prefix": "container",
+    "body": [
+      "${1:identifier} = container \"${2:name}\" \"${3:description}\" \"${4:technology}\" \"${5:tags}\" {",
+      "\t${6}",
+      "}"
+    ],
+    "description": "Snippet for defining a container"
+  },
+  "component": {
+    "prefix": "component",
+    "body": [
+      "${1:identifier} = component \"${2:name}\" \"${3:description}\" \"${4:technology}\" \"${5:tags}\" {",
+      "\t{6}",
+      "}"
+    ],
+    "description": "Snippet for defining a component"
+  },
+  "relationship": {
+    "prefix": "relationship",
+    "body": [
+      "${1:identifier} -> ${2:identifier} \"${3:description}\"" 
+    ],
+    "description": "Snippet for defining a relationship"
+  },
+  "deploymentEnvironment": {
+    "prefix": "deploymentEnvironment",
+    "body": [
+      "${1:identifier} = deploymentEnvironment \"${2:name}\" {",
+      "\t${3}",
+      "}"
+    ],
+    "description": "Snippet for defining a deployment environment"
+  },
+  "deploymentGroup": {
+    "prefix": "deploymentGroup",
+    "body": [
+      "${1:identifier} = deploymentGroup \"${2:name}\""
+    ],
+    "description": "Snippet for defining a deployment group"
+  },
+  "deploymentNode": {
+    "prefix": "deploymentNode",
+    "body": [
+      "deploymentNode \"${1:name}\" \"${2:description}\" \"${3:technology}\" \"${4:tags}\" ${5:1} {",
+      "\t${6}",
+      "}"
+    ],
+    "description": "Snippet for defining a deployment node"
+  },
+  "infrastructureNode": {
+    "prefix": "infrastructureNode",
+    "body": [
+      "${1:identifier} = infrastructureNode \"${2:name}\" \"${3:description}\" \"${4:technology}\" \"${5:tags}\""
+    ],
+    "description": "Snippet for defining an infrastructure node"
+  },
+  "softwareSystemInstance": {
+    "prefix": "softwareSystemInstance",
+    "body": [
+      "${1:softwareSystem_identifier} = softwareSystemInstance ${1:softwareSystem_identifier} \"${2}\" \"${3:tags}\" {}"
+    ],
+    "description": "Snippet for defining a software system instance"
+  },
+  "containerInstance": {
+    "prefix": "containerInstance",
+    "body": [
+      "${1:container_identifier} = containerInstance ${2:softwareSystem_identifier}.${1:container_identifier} \"${3}\" \"${4:tags}\" {}"
+    ],
+    "description": "Snippet for defining a container instance"
+  },
+  "healthCheck": {
+    "prefix": "healthCheck",
+    "body": [
+      "healthCheck \"${1:name}\" ${2:url} ${3:60} ${4:0}"
+    ],
+    "description": "Snippet for defining a health check"
+  },
+  "systemLandscape": {
+    "prefix": "systemLandscape",
+    "body": [
+      "systemLandscape \"${1:name}\" \"${2:description}\" {",
+      "\tinclude *",
+      "}"
+    ],
+    "description": "Snippet for defining a system landscape"
+  },
+  "systemContext": {
+    "prefix": "systemContext",
+    "body": [
+      "systemContext ${1:softwareSystem_identifier} \"${2:name}\" \"${3:description}\" {",
+      "\tinclude *",
+      "}"
+    ],
+    "description": "Snippet for defining a system context"
+  },
+  "containerView": {
+    "prefix": "container",
+    "body": [
+      "container ${1:container_identifier} \"${2:name}\" \"${3:description}\" {",
+      "\tinclude *",
+      "}"
+    ],
+    "description": "Snippet for defining a container view"
+  },
+  "componentView": {
+    "prefix": "component",
+    "body": [
+      "component ${1:container_identifier}.${2:component_identifier} \"${3:name}\" \"${4:description}\" {",
+      "\tinclude *",
+      "}"
+    ],
+    "description": "Snippet for defining a component view"
+  },
+  "deploymentView": {
+    "prefix": "deployment",
+    "body": [
+      "deployment * ${1:identifier} \"${2:name}\" \"${3:description}\" {",
+      "\tinclude *",
+      "}"
+    ],
+    "description": "Snippet for defining a deployment view"
+  },
+  "dynamicView": {
+    "prefix": "dynamic",
+    "body": [
+      "dynamic * \"${1:name}\" \"${2:description}\" {",
+      "\t${3}",
+      "}"
+    ],
+    "description": "Snippet for defining a dynamic view"
+  },
+  "filteredView": {
+    "prefix": "filtered",
+    "body": [
+      "filtered \"${1:baseview_name}\" ${2:include|exclude} \"${3:tags}\" \"${4:name}\" \"${5:description}\""
+    ],
+    "description": "Snippet for defining a filtered view"
+  },
+  "theme": {
+    "prefix": "theme",
+    "body": [
+      "theme ${1:https://theme.url}" 
+    ],
+    "description": "Snippet for defining a theme"
+  },
+  "styles": {
+    "prefix": "styles",
+    "body": [
+      "styles {",
+      "\t${1}",
+      "}"
+    ],
+    "description": "Snippet for defining styles"
+  },
+  "element": {
+    "prefix": "element",
+    "body": [
+      "element ${1:tag} {",
+      "\t${2}",
+      "}"
+    ],
+    "description": "Snippet for defining an element block"
+  },
+  "shape": {
+    "prefix": "shape",
+    "body": [
+      "shape ${1|Box,RoundedBox,Circle,Ellipse,Hexagon,Cylinder,Pipe,Person,Robot,Folder,WebBrowser,MobileDevicePortrait,MobileDeviceLandscape,Component|}"
+    ],
+    "description": "Snippet for setting the shape"
+  },
+  "icon": {
+    "prefix": "icon",
+    "body": [
+      "icon ${1:file|url}"
+    ],
+    "description": "Snippet for setting an icon"
+  },
+  "width": {
+    "prefix": "width",
+    "body": [
+      "width ${1:integer}"
+    ],
+    "description": "Snippet for setting width"
+  },
+  "height": {
+    "prefix": "height",
+    "body": [
+      "height ${1:integer}"
+    ],
+    "description": "Snippet for setting height"
+  },
+  "background": {
+    "prefix": "background",
+    "body": [
+      "background ${1:#rrggbb|color name}"
+    ],
+    "description": "Snippet for setting the background color"
+  },
+  "color": {
+    "prefix": "color",
+    "body": [
+      "color ${1:#rrggbb|color name}"
+    ],
+    "description": "Snippet for setting text color"
+  },
+  "colour": {
+    "prefix": "colour",
+    "body": [
+      "colour ${1:#rrggbb|color name}"
+    ],
+    "description": "Snippet for setting the colour (UK spelling)"
+  },
+  "stroke": {
+    "prefix": "stroke",
+    "body": [
+      "stroke ${1:#rrggbb|color name}"
+    ],
+    "description": "Snippet for setting the stroke color"
+  },
+  "strokeWidth": {
+    "prefix": "strokeWidth",
+    "body": [
+      "strokeWidth ${1:integer: 1-10}"
+    ],
+    "description": "Snippet for setting the stroke width"
+  },
+  "fontSize": {
+    "prefix": "fontSize",
+    "body": [
+      "fontSize ${1:integer}"
+    ],
+    "description": "Snippet for setting the font size"
+  },
+  "border": {
+    "prefix": "border",
+    "body": [
+      "border ${1|solid,dashed,dotted|}"
+    ],
+    "description": "Snippet for setting the border style"
+  },
+  "opacity": {
+    "prefix": "opacity",
+    "body": [
+      "opacity ${1:integer: 0-100}"
+    ],
+    "description": "Snippet for setting opacity"
+  },
+  "metadata": {
+    "prefix": "metadata",
+    "body": [
+      "metadata ${1|true,false|}"
+    ],
+    "description": "Snippet for setting metadata"
+  },
+  "description": {
+    "prefix": "description",
+    "body": [
+      "description ${1|true,false|}"
+    ],
+    "description": "Snippet for setting the description visibility"
+  },
+  "properties": {
+    "prefix": "properties",
+    "body": [
+      "properties {",
+      "\t${1:name} ${2:value}",
+      "}"
+    ],
+    "description": "Snippet for defining properties"
+  },
+  "srelationship": {
+    "prefix": "srelationship",
+    "body": [
+      "relationship ${1:tag} {",
+      "\t${0}",
+      "}"
+    ],
+    "description": "Snippet for defining a relationship block"
+  },
+  "thickness": {
+    "prefix": "thickness",
+    "body": [
+      "thickness ${1:integer}"
+    ],
+    "description": "Snippet for setting the thickness"
+  },
+  "style": {
+    "prefix": "style",
+    "body": [
+      "style ${1|solid,dashed,dotted|}"
+    ],
+    "description": "Snippet for setting the style of the relationship"
+  },
+  "routing": {
+    "prefix": "routing",
+    "body": [
+      "routing ${1|Direct,Orthogonal,Curved|}"
+    ],
+    "description": "Snippet for setting the routing method"
+  },
+  "position": {
+    "prefix": "position",
+    "body": [
+      "position ${1:integer: 0-100}"
+    ],
+    "description": "Snippet for setting the position of the relationship"
+  },
+  "branding": {
+    "prefix": "branding",
+    "body": [
+      "branding {",
+      "\tlogo ${1:file|url}",
+      "}"
+    ],
+    "description": "Snippet for defining branding"
+  }
+}
+
