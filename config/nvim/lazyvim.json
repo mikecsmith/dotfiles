@@ -18,6 +18,7 @@
     "lazyvim.plugins.extras.lang.typescript",
     "lazyvim.plugins.extras.lang.yaml",
     "lazyvim.plugins.extras.linting.eslint",
+    "lazyvim.plugins.extras.lsp.neoconf",
   ],
   "news": {
     "NEWS.md": "6520"
