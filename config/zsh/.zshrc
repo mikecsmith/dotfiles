@@ -95,6 +95,7 @@ export PATH=$HOME/.npm-packages/bin:$HOME/bin:$PATH
 export PATH=$HOME/.local/bin:$PATH
 export PATH=/opt/homebrew/bin:$PATH
 export PATH=$PATH:$HOME/.cargo/bin
+export PATH=$PATH:$HOME/.luarocks/bin
 
 # ============================================================================
 # Useful Aliases

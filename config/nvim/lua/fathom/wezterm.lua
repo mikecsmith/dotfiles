@@ -1,4 +1,4 @@
----@class fathom.wezterm_nav
+---@class fathom.wezterm
 local M = {}
 -- Function to check if a Wezterm pane exists and activate it if present
 function M.check_wezterm_pane(direction)
@@ -38,3 +38,4 @@ function M.move_or_fallback(direction)
 end
 
 return M
+

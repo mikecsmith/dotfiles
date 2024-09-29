@@ -1,189 +1,97 @@
---- Taken from Fathom
----@class fathom.cmp
 local M = {}
 
----@alias Placeholder {n:number, text:string}
-
----@param snippet string
----@param fn fun(placeholder:Placeholder):string
----@return string
-function M.snippet_replace(snippet, fn)
-	return snippet:gsub("%$%b{}", function(m)
-		local n, name = m:match("^%${(%d+):(.+)}$")
-		return n and fn({ n = n, text = name }) or m
-	end) or snippet
-end
-
--- This function resolves nested placeholders in a snippet.
----@param snippet string
----@return string
-function M.snippet_preview(snippet)
-	local ok, parsed = pcall(function()
-		return vim.lsp._snippet_grammar.parse(snippet)
-	end)
-	return ok and tostring(parsed)
-		or M.snippet_replace(snippet, function(placeholder)
-			return M.snippet_preview(placeholder.text)
-		end):gsub("%$0", "")
-end
-
--- This function replaces nested placeholders in a snippet with LSP placeholders.
-function M.snippet_fix(snippet)
-	local texts = {} ---@type table<number, string>
-	return M.snippet_replace(snippet, function(placeholder)
-		texts[placeholder.n] = texts[placeholder.n] or M.snippet_preview(placeholder.text)
-		return "${" .. placeholder.n .. ":" .. texts[placeholder.n] .. "}"
-	end)
-end
-
----@param entry cmp.Entry
-function M.auto_brackets(entry)
-	local cmp = require("cmp")
-	local Kind = cmp.lsp.CompletionItemKind
-	local item = entry:get_completion_item()
-	if vim.tbl_contains({ Kind.Function, Kind.Method }, item.kind) then
-		local cursor = vim.api.nvim_win_get_cursor(0)
-		local prev_char = vim.api.nvim_buf_get_text(0, cursor[1] - 1, cursor[2], cursor[1] - 1, cursor[2] + 1, {})[1]
-		if prev_char ~= "(" and prev_char ~= ")" then
-			local keys = vim.api.nvim_replace_termcodes("()<left>", false, false, true)
-			vim.api.nvim_feedkeys(keys, "i", true)
-		end
-	end
-end
-
--- This function adds missing documentation to snippets.
--- The documentation is a preview of the snippet.
----@param window cmp.CustomEntriesView|cmp.NativeEntriesView
-function M.add_missing_snippet_docs(window)
-	local cmp = require("cmp")
-	local Kind = cmp.lsp.CompletionItemKind
-	local entries = window:get_entries()
-	for _, entry in ipairs(entries) do
-		if entry:get_kind() == Kind.Snippet then
-			local item = entry:get_completion_item()
-			if not item.documentation and item.insertText then
-				item.documentation = {
-					kind = cmp.lsp.MarkupKind.Markdown,
-					value = string.format("```%s\n%s\n```", vim.bo.filetype, M.snippet_preview(item.insertText)),
-				}
-			end
-		end
-	end
-end
-
-function M.visible()
-	---@module 'cmp'
-	local cmp = package.loaded["cmp"]
-	return cmp and cmp.core.view:visible()
-end
+M.toggle_chars = {
+  '"',
+  "'",
+  "`",
+  "<",
+  ">",
+  "{",
+  "}",
+  "[",
+  "]",
+  "(",
+  ")",
+  " ",
+  "",
+}
 
 -- This function toggles the ghost_text setting based on the users context
 function M.toggle_ghost_text()
-	if vim.api.nvim_get_mode().mode ~= "i" then
-		return
-	end
+  if vim.api.nvim_get_mode().mode ~= "i" then
+    return
+  end
 
-	local cursor_col = vim.fn.col(".") -- Get cursor column
-	local line = vim.fn.getline(".") -- Get current line content
-	local char_after = line:sub(cursor_col, cursor_col)
-	local should_enable_ghost_text = vim.tbl_contains(Fathom.config.cmp.toggle_chars, char_after)
+  local cursor_col = vim.fn.col(".") -- Get cursor column
+  local line = vim.fn.getline(".") -- Get current line content
+  local char_after = line:sub(cursor_col, cursor_col)
+  local should_enable_ghost_text = vim.tbl_contains(M.toggle_chars, char_after)
 
-	local cmp_config = require("cmp.config")
-	if should_enable_ghost_text then
-		cmp_config.set_onetime({
-			experimental = {
-				ghost_text = {
-					hl_group = "CmpGhostText",
-				},
-			},
-		})
-	else
-		cmp_config.set_onetime({
-			experimental = {
-				ghost_text = false,
-			},
-		})
-	end
+  local cmp_config = require("cmp.config")
+  if should_enable_ghost_text then
+    cmp_config.set_onetime({
+      experimental = {
+        ghost_text = {
+          hl_group = "CmpGhostText",
+        },
+      },
+    })
+  else
+    cmp_config.set_onetime({
+      experimental = {
+        ghost_text = false,
+      },
+    })
+  end
 end
 
--- This is a better implementation of `cmp.confirm`:
---  * check if the completion menu is visible without waiting for running sources
---  * create an undo point before confirming
--- This function is both faster and more reliable.
----@param opts? {select: boolean, behavior: cmp.ConfirmBehavior}
-function M.confirm(opts)
-	local cmp = require("cmp")
-	opts = vim.tbl_extend("force", {
-		select = true,
-		behavior = cmp.ConfirmBehavior.Insert,
-	}, opts or {})
-	return function(fallback)
-		if cmp.core.view:visible() or vim.fn.pumvisible() == 1 then
-			Fathom.create_undo()
-			if cmp.confirm(opts) then
-				return
-			end
-		end
-		return fallback()
-	end
-end
+-- Utility method to filter out the buffer & copilot sources, remove text completions from LSP, and apply stricter matching rules to some sources
+function M.process_sources(sources)
+  local types = require("cmp.types")
+  local matcher = require("cmp.matcher")
 
-function M.expand(snippet)
-	-- Native sessions don't support nested snippet sessions.
-	-- Always use the top-level session.
-	-- Otherwise, when on the first placeholder and selecting a new completion,
-	-- the nested session will be used instead of the top-level session.
-	-- See: https://github.com/LazyVim/LazyVim/issues/3199
-	local session = vim.snippet.active() and vim.snippet._session or nil
+  local processed_sources = vim.tbl_map(function(source)
+    if source.name == "buffer" then
+      return nil
+    elseif source.name == "copilot" then
+      return nil
+    elseif source.name == "nvim_lsp" then
+      return vim.tbl_deep_extend("force", source, {
+        ---@param entry cmp.Entry
+        entry_filter = function(entry, _)
+          local kind = types.lsp.CompletionItemKind[entry:get_kind()]
+          if kind == "Text" then
+            return false
+          end
+          return true
+        end,
+      })
+    elseif source.name == "snippets" then
+      return vim.tbl_deep_extend("force", source, {
+        ---@param entry cmp.Entry
+        ---@param ctx cmp.Context
+        entry_filter = function(entry, ctx)
+          local input = vim.trim(ctx.cursor_before_line)
+          local word = entry.completion_item.label
 
-	local ok, err = pcall(vim.snippet.expand, snippet)
-	if not ok then
-		local fixed = M.snippet_fix(snippet)
-		ok = pcall(vim.snippet.expand, fixed)
+          local score = matcher.match(input, word, {
+            disallow_fuzzy_matching = true,
+            disallow_partial_matching = true,
+            disallow_prefix_unmatching = true,
+            disallow_fullfuzzy_matching = true,
+            disallow_partial_fuzzy_matching = true,
+            disallow_symbol_nonprefix_matching = true,
+          })
+          return score > 0
+        end,
+      })
+    end
+    return source
+  end, sources or {})
 
-		local msg = ok and "Failed to parse snippet,\nbut was able to fix it automatically."
-			or ("Failed to parse snippet.\n" .. err)
-
-		Fathom[ok and "warn" or "error"](
-			([[%s
-```%s
-%s
-```]]):format(msg, vim.bo.filetype, snippet),
-			{ title = "vim.snippet" }
-		)
-	end
-
-	-- Restore top-level session when needed
-	if session then
-		vim.snippet._session = session
-	end
-end
-
----@param opts cmp.ConfigSchema | {auto_brackets?: string[]}
-function M.setup(opts)
-	for _, source in ipairs(opts.sources) do
-		source.group_index = source.group_index or 1
-	end
-
-	local parse = require("cmp.utils.snippet").parse
-	require("cmp.utils.snippet").parse = function(input)
-		local ok, ret = pcall(parse, input)
-		if ok then
-			return ret
-		end
-		return Fathom.cmp.snippet_preview(input)
-	end
-
-	local cmp = require("cmp")
-	cmp.setup(opts)
-	cmp.event:on("confirm_done", function(event)
-		if vim.tbl_contains(opts.auto_brackets or {}, vim.bo.filetype) then
-			Fathom.cmp.auto_brackets(event.entry)
-		end
-	end)
-	cmp.event:on("menu_opened", function(event)
-		Fathom.cmp.add_missing_snippet_docs(event.window)
-	end)
+  return vim.tbl_filter(function(source)
+    return source ~= nil
+  end, processed_sources)
 end
 
 return M
