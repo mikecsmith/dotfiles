@@ -15,3 +15,13 @@ local tsquery = [[
 
 -- Activate otter for all languages, with all features using a Quarto specific treesitter query
 require("otter").activate(nil, true, true, tsquery)
+
+-- Overwrite the LazyVim keybindings to make <leader>cf work like <leader>cF
+vim.keymap.set({ "n", "v" }, "<leader>cf", function()
+  -- Conditional check for the filetype - use require conform for quarto files
+  if vim.bo.filetype == "quarto" then
+    require("conform").format({ formatters = { "injected" }, timeout_ms = 3000 })
+  else
+    LazyVim.format({ force = true })
+  end
+end, { desc = "Format" })

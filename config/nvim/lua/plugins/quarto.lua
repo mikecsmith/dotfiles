@@ -1,3 +1,4 @@
+-- LazyVim already has the injected formatter configured
 return {
   -- Update Marksman to work with Quarto
   {
