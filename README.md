@@ -64,7 +64,7 @@ query-map     = ~/.config/aerc/<your-map>.map
 
 - Create `config/aerc/<your-map>.map` with the following:
 
-```
+```text
 inbox=tag:inbox
 unread=tag:unread and tag:inbox and not tag:sent
 sent=tag:sent
