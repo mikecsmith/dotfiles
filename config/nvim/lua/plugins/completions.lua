@@ -71,7 +71,6 @@ return {
     opts = function(_, opts)
       local cmp = require("cmp")
       local copilot = require("copilot.suggestion")
-      print(vim.inspect(opts))
 
       opts.sources = require("fathom.cmp").process_sources(opts.sources)
 
@@ -174,7 +173,6 @@ return {
         ---@diagnostic disable-next-line: missing-fields
         matching = { disallow_symbol_nonprefix_matching = false },
       })
-      print(vim.inspect(opts))
       return opts
     end,
   },
