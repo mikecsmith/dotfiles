@@ -24,7 +24,7 @@ vim.keymap.set({ "n", "v" }, "<leader>cf", function()
   else
     LazyVim.format({ force = true })
   end
-end, { desc = "Format" })
+end, { desc = "Format", buffer = true })
 
 vim.api.nvim_create_autocmd("FileType", {
   pattern = "quarto",
