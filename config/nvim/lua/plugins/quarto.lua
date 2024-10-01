@@ -35,4 +35,11 @@ return {
     },
     ft = { "quarto" },
   },
+  {
+    "nvim-treesitter/nvim-treesitter",
+    opts = function(_, opts)
+      vim.treesitter.language.register("markdown", "quarto")
+      return opts
+    end,
+  },
 }
