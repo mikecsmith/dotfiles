@@ -14,6 +14,7 @@ vim.api.nvim_create_autocmd({ "InsertEnter", "CursorMovedI" }, {
 
 -- Fixes super annoying issue with :q in last window when NeoTree/Copilot Chat are open
 vim.api.nvim_create_autocmd("BufEnter", {
+  group = augroup("quit"),
   pattern = "*",
   callback = function()
     if vim.fn.winnr("$") > 1 then
@@ -28,6 +29,7 @@ vim.api.nvim_create_autocmd("BufEnter", {
 
 -- Quarto Autocmd - use this rather than after/ftplugin as LazyVim often overwrites
 vim.api.nvim_create_autocmd("FileType", {
+  group = augroup("quarto"),
   pattern = "quarto",
   callback = function()
     -- Activate otter for all languages, with all features using a Quarto specific treesitter query
@@ -62,6 +64,7 @@ vim.api.nvim_create_autocmd("FileType", {
 
 -- Structurizr Autocmd - use this rather than after/ftplugin as LazyVim often overwrites
 vim.api.nvim_create_autocmd("FileType", {
+  group = augroup("structurizr"),
   pattern = "structurizr",
   callback = function()
     local original_cwd = vim.fn.getcwd()
