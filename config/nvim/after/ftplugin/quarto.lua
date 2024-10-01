@@ -25,3 +25,8 @@ vim.keymap.set({ "n", "v" }, "<leader>cf", function()
     LazyVim.format({ force = true })
   end
 end, { desc = "Format" })
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "quarto",
+  command = "setlocal formatoptions-=ro",
+})
