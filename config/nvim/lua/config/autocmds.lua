@@ -12,3 +12,15 @@ vim.api.nvim_create_autocmd({ "InsertEnter", "CursorMovedI" }, {
   callback = require("fathom.cmp").toggle_ghost_text,
 })
 
+vim.api.nvim_create_autocmd("BufEnter", {
+  pattern = "*",
+  callback = function()
+    if vim.fn.winnr("$") > 1 then
+      return
+    end
+
+    if vim.bo.filetype == "neo-tree" then
+      vim.cmd("quit")
+    end
+  end,
+})
