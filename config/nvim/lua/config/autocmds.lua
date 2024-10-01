@@ -24,3 +24,64 @@ vim.api.nvim_create_autocmd("BufEnter", {
     end
   end,
 })
+
+-- Quarto Autocmd - use this rather than after/ftplugin as LazyVim often overwrites
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "quarto",
+  callback = function()
+    -- Activate otter for all languages, with all features using a Quarto specific treesitter query
+    local tsquery = [[
+      (fenced_code_block
+      (info_string
+        (language) @_lang
+      ) @info
+        (#match? @info "{")
+      (code_fence_content) @content (#offset! @content)
+      )
+      ((html_block) @html @combined)
+
+      ((minus_metadata) @yaml (#offset! @yaml 1 0 -1 0))
+      ((plus_metadata) @toml (#offset! @toml 1 0 -1 0))
+    ]]
+    require("otter").activate(nil, true, true, tsquery)
+
+    -- Overwrite the LazyVim keybindings to make <leader>cf work like <leader>cF
+    vim.keymap.set({ "n", "v" }, "<leader>cf", function()
+      if vim.bo.filetype == "quarto" then
+        require("conform").format({ formatters = { "injected" }, timeout_ms = 3000 })
+      else
+        LazyVim.format({ force = true })
+      end
+    end, { desc = "Format", buffer = true })
+
+    -- Fixes the godawful autoindent on <CR> in lists
+    vim.cmd("setlocal formatoptions-=ro")
+  end,
+})
+
+-- Structurizr Autocmd - use this rather than after/ftplugin as LazyVim often overwrites
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "structurizr",
+  callback = function()
+    local original_cwd = vim.fn.getcwd()
+    local lsp_cwd = os.getenv("HOME") .. "/.local/share/lsp-servers/c4-dsl-language-server"
+
+    vim.cmd("cd " .. lsp_cwd)
+
+    vim.lsp.start({
+      name = "c4-language-server",
+      filetypes = { "structurizr" },
+      capabilities = require("cmp_nvim_lsp").default_capabilities(),
+      flags = {
+        debounce_text_changes = 150,
+        allow_incremental_sync = true,
+        exit_timeout = 150,
+      },
+      cmd = { lsp_cwd .. "/bin/c4-language-server" },
+      root_dir = vim.fs.root(0, { "workspace.dsl" }),
+    })
+
+    vim.cmd("cd " .. original_cwd)
+    vim.cmd("setlocal nosmartindent")
+  end,
+})
