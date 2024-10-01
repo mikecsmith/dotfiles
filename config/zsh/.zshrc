@@ -74,7 +74,7 @@ setopt SHARE_HISTORY        # Share history across multiple sessions
 setopt EXTENDED_HISTORY     # Store timestamps in history file
 
 # ============================================================================
-# Keybindings for History Search
+# Keybindings
 # ============================================================================
 
 # Bind arrow keys for history search based on the beginning of a command
@@ -127,6 +127,7 @@ eval "$(mise activate zsh --shims)"
 # Load ZSH autosuggestions from Homebrew (only if Homebrew is installed)
 if type brew &>/dev/null; then
   source <(fzf --zsh)
+  source "$(brew --prefix)/opt/zsh-vi-mode/share/zsh-vi-mode/zsh-vi-mode.plugin.zsh"
   source "$(brew --prefix)/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
   source "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" # Must be last thing sourced
 fi
