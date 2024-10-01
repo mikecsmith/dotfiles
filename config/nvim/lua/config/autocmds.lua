@@ -12,6 +12,7 @@ vim.api.nvim_create_autocmd({ "InsertEnter", "CursorMovedI" }, {
   callback = require("fathom.cmp").toggle_ghost_text,
 })
 
+-- Fixes super annoying issue with :q in last window when NeoTree is open
 vim.api.nvim_create_autocmd("BufEnter", {
   pattern = "*",
   callback = function()
