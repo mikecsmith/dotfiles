@@ -8,8 +8,8 @@ julia = 'latest'
 kotlin = '2.0.20'
 quarkus = '3.14.1'
 node = 'lts'
-python = 'latest'
 scala = 'latest'
+python = "3.12.6"
 
 [settings]
 
