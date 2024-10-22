@@ -6,6 +6,7 @@ gradle = '8.9'
 java = "corretto-21"
 julia = 'latest'
 kotlin = '2.0.20'
+lua = '5.1'
 quarkus = '3.14.1'
 node = 'lts'
 scala = 'latest'
@@ -16,4 +17,4 @@ python = "3.12.6"
 legacy_version_file = true
 
 always_keep_download = false # deletes downloads after install
-always_keep_install = false # deletes an install on a failure
+always_keep_install = false  # deletes an install on a failure
