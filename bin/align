@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+delim="${1:-\|}"
+interm="${2:-\~}"
+sed "s/$delim/$interm$delim/g" | column -t -s "$interm" | sed "s/  $delim/$delim/g" | awk -v delim="$delim" '{ if ($0 ~ "^[" delim " -]*$") gsub(" ", "-", $0); print }'
