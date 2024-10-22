@@ -17,7 +17,6 @@ return {
           accept_line = "<M-l>",
           next = "<M-]>",
           prev = "<M-[>",
-          dismiss = "/",
         },
       },
       filetypes = { markdown = true },
@@ -109,7 +108,6 @@ return {
             return fallback()
           end,
         }),
-        ["/"] = cmp.mapping.close(),
         ["<CR>"] = cmp.mapping({
           i = LazyVim.cmp.confirm({ cmp.ConfirmBehavior.Replace, select = false }),
 
