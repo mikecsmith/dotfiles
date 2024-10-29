@@ -89,3 +89,19 @@ vim.api.nvim_create_autocmd("FileType", {
     vim.cmd("setlocal nosmartindent")
   end,
 })
+
+-- Disable prettier when DenoLS is active and no prettier config is found
+vim.api.nvim_create_autocmd("LspAttach", {
+  group = augroup("deno"),
+  callback = function(ev)
+    local clients = vim.lsp.get_clients({ bufnr = ev.buf })
+    local denols_attached = false
+    for _, client in ipairs(clients) do
+      if client.name == "denols" then
+        denols_attached = true
+        break
+      end
+    end
+    vim.g.lazyvim_prettier_needs_config = denols_attached
+  end,
+})
