@@ -1,16 +1,18 @@
 [tools]
 # global tool versions go here
 
+deno = '2'
 go = '1.22'
 gradle = '8.9'
 java = "corretto-21"
 julia = 'latest'
 kotlin = '2.0.20'
 lua = '5.1'
-quarkus = '3.14.1'
 node = 'lts'
-scala = 'latest'
+pnpm = '9'
 python = "3.12.6"
+quarkus = '3.14.1'
+scala = 'latest'
 
 [settings]
 
