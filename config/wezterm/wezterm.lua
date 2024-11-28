@@ -222,8 +222,8 @@ config.keys = {
 
 	-- Vertical split
 	{
-		key = "|",
-		mods = "LEADER|SHIFT",
+		key = "'",
+		mods = "LEADER",
 		action = act.SplitPane({
 			direction = "Right",
 			size = { Percent = 50 },
