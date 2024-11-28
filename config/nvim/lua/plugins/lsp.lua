@@ -21,9 +21,6 @@ return {
                 variableTypes = {
                   enabled = true,
                 },
-                functionLikeReturnTypes = {
-                  enabled = true,
-                },
                 enumMemberValues = {
                   enabled = true,
                 },
