@@ -6,12 +6,6 @@ local function augroup(name)
   return vim.api.nvim_create_augroup("fathom_" .. name, { clear = true })
 end
 
--- Toggle cmp ghost text based on insert and cusor movement
-vim.api.nvim_create_autocmd({ "InsertEnter", "CursorMovedI" }, {
-  group = augroup("cmp_toggle_ghost_text"),
-  callback = require("fathom.cmp").toggle_ghost_text,
-})
-
 -- Fixes super annoying issue with :q in last window when NeoTree/Copilot Chat are open
 vim.api.nvim_create_autocmd("BufEnter", {
   group = augroup("quit"),
