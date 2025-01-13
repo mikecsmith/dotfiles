@@ -69,7 +69,7 @@ vim.api.nvim_create_autocmd("FileType", {
     vim.lsp.start({
       name = "c4-language-server",
       filetypes = { "structurizr" },
-      capabilities = require("cmp_nvim_lsp").default_capabilities(),
+      capabilities = vim.lsp.protocol.make_client_capabilities(),
       flags = {
         debounce_text_changes = 150,
         allow_incremental_sync = true,
