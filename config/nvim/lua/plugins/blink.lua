@@ -5,6 +5,9 @@ return {
       keymap = {
         preset = "super-tab",
       },
+      sources = {
+        cmdline = { "cmdline" },
+      },
     },
   },
 }
