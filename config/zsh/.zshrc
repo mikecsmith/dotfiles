@@ -77,9 +77,6 @@ setopt EXTENDED_HISTORY     # Store timestamps in history file
 # Keybindings
 # ============================================================================
 
-# Bind arrow keys for history search based on the beginning of a command
-bindkey "^[[A" history-beginning-search-backward   # Up Arrow
-bindkey "^[[B" history-beginning-search-forward    # Down Arrow
 
 # Bind Ctrl+P/N for more general history search
 bindkey '^P' history-search-backward               # Ctrl+P
@@ -89,6 +86,8 @@ bindkey '^N' history-search-forward                # Ctrl+N
 # PATH Configuration
 # ============================================================================
 
+# Load 'mise' shell environment manager (if applicable)
+eval "$(mise activate zsh --shims)"
 export PATH=$(brew --prefix)/opt/libpq/bin:$PATH
 export PATH=$HOME/.pnpm-packages/bin:$HOME/.pnpm-packages:$PATH
 export PATH=$HOME/.npm-packages/bin:$HOME/bin:$PATH
@@ -121,13 +120,21 @@ bindkey "^W" backward-kill-word
 # External Tool Initialization
 # ============================================================================
 
-# Load 'mise' shell environment manager (if applicable)
-eval "$(mise activate zsh --shims)"
+
+if type kind &>/dev/null; then
+  eval "$(kind completion zsh)"
+fi
 
 # Load ZSH autosuggestions from Homebrew (only if Homebrew is installed)
 if type brew &>/dev/null; then
   source <(fzf --zsh)
   source "$(brew --prefix)/opt/zsh-vi-mode/share/zsh-vi-mode/zsh-vi-mode.plugin.zsh"
+  zvm_after_init_commands+=(
+    'bindkey "^[[A" history-beginning-search-backward'  # Up Arrow
+    'bindkey "^[[B" history-beginning-search-forward'   # Down Arrow
+  )
   source "$(brew --prefix)/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+  ZSH_AUTOSUGGEST_CLEAR_WIDGETS=(accept-line copy-earlier-word)
   source "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" # Must be last thing sourced
 fi
+
