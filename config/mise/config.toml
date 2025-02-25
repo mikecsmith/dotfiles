@@ -6,13 +6,16 @@ go = '1.22'
 gradle = '8.9'
 java = "corretto-21"
 julia = 'latest'
-kotlin = '2.0.20'
+kind = 'latest'
+kubectl = 'latest'
+helm = 'latest'
 lua = '5.1'
 node = 'lts'
 pnpm = '9'
 python = "3.12.6"
 quarkus = '3.14.1'
 scala = 'latest'
+kustomize = "5.6.0"
 
 [settings]
 
