@@ -138,3 +138,12 @@ if type brew &>/dev/null; then
   source "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" # Must be last thing sourced
 fi
 
+
+
+# pnpm
+export PNPM_HOME="/Users/mike.smith1/.local/share/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+# pnpm end
