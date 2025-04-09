@@ -31,9 +31,13 @@ return {
   {
     "MeanderingProgrammer/render-markdown.nvim",
     opts = {
-      file_types = { "quarto" },
+      file_types = { "quarto", "markdown" },
+      code = {
+        border = "none",
+        width = "full",
+      },
     },
-    ft = { "quarto" },
+    ft = { "quarto", "markdown" },
   },
   {
     "nvim-treesitter/nvim-treesitter",
@@ -41,13 +45,5 @@ return {
       vim.treesitter.language.register("markdown", "quarto")
       return opts
     end,
-  },
-  {
-    "quarto-dev/quarto-nvim",
-    dependencies = {
-      "jmbuhr/otter.nvim",
-      "nvim-treesitter/nvim-treesitter",
-    },
-    opts = {},
   },
 }
