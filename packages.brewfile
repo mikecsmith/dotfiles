@@ -65,4 +65,4 @@ brew "koekeishiya/formulae/skhd"
 brew "koekeishiya/formulae/yabai"
 
 tap "ankitpokhrel/jira-cli"
-brew "ankitpokhrel/jira-cli"
+brew "jira-cli"
