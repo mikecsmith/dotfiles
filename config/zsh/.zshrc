@@ -39,18 +39,6 @@ if type brew &>/dev/null; then
 fi
 
 # ============================================================================
-# Environment Variables
-# ============================================================================
-
-# Color settings for 'ls' and other utilities
-export LS_COLORS=$(vivid generate one-dark)
-export CLICOLOR=1
-
-# Set preferred editor
-export EDITOR="vim"         # Default editor (Vim)
-export VISUAL="vim"        # Visual editor (VS Code)
-
-# ============================================================================
 # ZSH History Configuration
 # ============================================================================
 
@@ -77,7 +65,6 @@ setopt EXTENDED_HISTORY     # Store timestamps in history file
 # Keybindings
 # ============================================================================
 
-
 # Bind Ctrl+P/N for more general history search
 bindkey '^P' history-search-backward               # Ctrl+P
 bindkey '^N' history-search-forward                # Ctrl+N
@@ -95,6 +82,24 @@ export PATH=$HOME/.local/bin:$PATH
 export PATH=/opt/homebrew/bin:$PATH
 export PATH=$PATH:$HOME/.cargo/bin
 export PATH=$PATH:$HOME/.luarocks/bin
+
+# ============================================================================
+# Environment Variables
+# ============================================================================
+
+# Color settings for 'ls' and other utilities
+export LS_COLORS=$(vivid generate tokyonight-moon)
+export CLICOLOR=1
+
+# Set preferred editor
+export EDITOR="nvim"         
+export VISUAL="nvim"        
+
+# Set environment variables not stored in git
+if [ -f ~/.zsh_secrets ]; then
+    source ~/.zsh_secrets
+fi
+
 
 # ============================================================================
 # Useful Aliases
@@ -138,12 +143,11 @@ if type brew &>/dev/null; then
   source "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" # Must be last thing sourced
 fi
 
-
-
 # pnpm
-export PNPM_HOME="/Users/mike.smith1/.local/share/pnpm"
+export PNPM_HOME="$HOME/.local/share/pnpm"
 case ":$PATH:" in
   *":$PNPM_HOME:"*) ;;
   *) export PATH="$PNPM_HOME:$PATH" ;;
 esac
 # pnpm end
+

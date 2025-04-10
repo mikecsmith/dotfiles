@@ -15,11 +15,6 @@ export ZSH_SESSION_DIR="$XDG_DATA_HOME/zsh/sessions"
 # Set the cache directory for Zsh (e.g., for zcompdump)
 export ZSH_CACHE_DIR="$XDG_CACHE_HOME/zsh"
 
-# Set development environment variables
-export DOCKER_HOST=unix://${HOME}/.config/colima/default/docker.sock
-export TESTCONTAINERS_HOST_OVERRIDE=$(colima ls -j | jq -r '.address')
-export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
-
 # Set the cache directory for NPM
 export NPM_CONFIG_USERCONFIG="$XDG_CONFIG_HOME/npm/config"
 
