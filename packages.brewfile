@@ -43,6 +43,7 @@ brew "zsh-syntax-highlighting"
 brew "zsh-vi-mode"
 
 # Casks
+cask "nikitabobko/tap/aerospace"
 cask "arc"
 cask "alacritty"
 cask "bruno"
@@ -59,10 +60,6 @@ cask "wezterm"
 cask "font-meslo-lg-nerd-font"
 
 # Custom Taps
-tap "koekeishiya/formulae"
-
-brew "koekeishiya/formulae/skhd"
-brew "koekeishiya/formulae/yabai"
 
 tap "ankitpokhrel/jira-cli"
 brew "jira-cli"
