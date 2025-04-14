@@ -1,17 +1,42 @@
 return {
-  "kristijanhusak/vim-dadbod-ui",
-  dependencies = {
-    { "tpope/vim-dadbod", lazy = true },
-    { "kristijanhusak/vim-dadbod-completion", ft = { "sql", "mysql", "plsql" }, lazy = true }, -- Optional
+  {
+    "kristijanhusak/vim-dadbod-ui",
+    dependencies = {
+      { "tpope/vim-dadbod", lazy = true },
+      { "kristijanhusak/vim-dadbod-completion", ft = { "sql", "mysql", "plsql" }, lazy = true }, -- Optional
+    },
+    cmd = {
+      "DBUI",
+      "DBUIToggle",
+      "DBUIAddConnection",
+      "DBUIFindBuffer",
+    },
+    init = function()
+      -- Your DBUI configuration
+      vim.g.db_ui_use_nerd_fonts = 1
+    end,
   },
-  cmd = {
-    "DBUI",
-    "DBUIToggle",
-    "DBUIAddConnection",
-    "DBUIFindBuffer",
+  {
+    "mfussenegger/nvim-lint",
+    opts = {
+      linters = {
+        sqlfluff = {
+          args = {
+            "lint",
+            "--format=json",
+          },
+        },
+      },
+    },
   },
-  init = function()
-    -- Your DBUI configuration
-    vim.g.db_ui_use_nerd_fonts = 1
-  end,
+  {
+    "stevearc/conform.nvim",
+    opts = {
+      formatters = {
+        sqlfluff = {
+          args = { "fix", "-" },
+        },
+      },
+    },
+  },
 }
