@@ -1,28 +1,347 @@
 #!/usr/bin/env bash
 
-set -eou pipefail
+BUG_TEMPLATE="**Bug Details:**
 
-# Check if an argument is passed
-STATUS_FLAG=""
-if [[ $# -gt 0 ]]; then
-    STATUS_FLAG="--status $1"
-fi
+**Steps to Reproduce:**
+1.
+2.
+3.
 
-jira issue list \
-    -a$(jira me) \
-    --plain \
-    --columns id,summary,status $STATUS_FLAG |  # Conditionally include the status flag with argument
-    fzf \
-        --layout=reverse \
-        --header-lines=1 \
-        --preview-window 'bottom:80%:wrap' \
-        --preview 'jira issue view {1}' \
-        --bind 'alt-p:toggle-preview' \
-        --bind='alt-b:preview-up' \
-        --bind='alt-f:preview-down' \
-        --bind 'alt-e:execute(jira issue edit {1})' \
-        --bind 'alt-o:become(jira open {1})' \
-        --bind 'alt-u:become(jira open --no-browser {1} | pbcopy)' \
-        --bind "alt-y:become[jira open --no-browser {1} | awk -F/ '{print \$NF}' | pbcopy ]" \
-        --bind 'alt-m:execute(jira issue move {1})' \
-        --bind 'alt-c:execute(nvim /tmp/jira_comment.md -c "set ft=markdown" && jira issue comment add {1} < /tmp/jira_comment.md && rm /tmp/jira_comment.md)'
+**Expected Result:**
+
+**Actual Result:**
+"
+
+STORY_TEMPLATE="**Summary:**
+
+**As a** 
+**I want** 
+**So that** 
+
+**Acceptance Criteria:**
+
+**Given** 
+**When** 
+**Then** "
+
+TASK_TEMPLATE="**Summary:**
+
+**Acceptance Criteria:**
+
+**Given** 
+**When** 
+**Then** "
+
+ISSUE_FRONTMATTER="---
+summary: 
+priority: Medium 
+---"
+
+EPIC_TEMPLATE="**Summary:**
+
+**Expected outcome:**
+
+**Goal:**
+"
+
+EPIC_FRONTMATTER="---
+name: 
+summary: 
+priority: Medium 
+---"
+
+# @cmd Holding command for show tasks
+# @meta inherit-flag-options
+# @flag -a --any Show issues from any user (removes -a$(jira me) filter)
+show() {
+  :
+}
+
+# @cmd Show all issues
+show::all() {
+  local filter
+  filter=$(get_filter "${argc_any:-}")
+  jira issue list --jql "$filter" --plain --columns id,summary,status,reporter,assignee | pipe_to_fzf
+}
+
+# @cmd Show issues in the current sprint
+show::current() {
+  local filter
+  filter=$(get_filter "${argc_any:-}")
+  jira sprint list --jql "$filter" --table --current --plain --columns=id,summary,status,reporter,assignee | pipe_to_fzf
+}
+
+# @cmd Show open issues (statuses: Ready for Development, In Progress, In Review)
+show::open() {
+  local filter
+  filter=$(get_filter "${argc_any:-}")
+  jira issue list --jql "$filter AND status IN ('Ready for Development', 'In Progress', 'In Review')" --plain --columns id,summary,status,reporter,assignee | pipe_to_fzf
+}
+
+# @cmd Show backlog issues (statuses: Backlog, Selected for Refinement, Refinement in progress, Refinement in review, Refined)
+show::backlog() {
+  local filter
+  filter=$(get_filter "${argc_any:-}")
+  jira issue list --jql "$filter AND status IN ('Backlog', 'Selected for Refinement', 'Refinement in progress', 'Refinement in review', 'Refined')" --plain --columns id,summary,status,reporter,assignee | pipe_to_fzf
+}
+
+# @cmd Show closed issues (statuses: Done, Wont Do)
+show::closed() {
+  local filter
+  filter=$(get_filter "${argc_any:-}")
+  jira issue list --jql "$filter AND status IN ('Done', 'Wont Do')" --plain --columns id,summary,status | pipe_to_fzf
+}
+
+# @cmd Holding command for create tasks
+# @meta inherit-flag-options
+# @flag -s --sprint Add the issue to the active sprint
+# @flag -b --bust Bust the cache
+create() {
+  :
+}
+
+# @cmd Debug
+debug() {
+  echo "sprint: $(get_active_sprint)"
+}
+
+# @cmd Create a new issue
+# @option --type[=Task|Bug|Story] Specify the type of issue to create (e.g., Story, Bug, Task)
+# @option --parent Specify the parent issue or epic for the new issue
+create::issue() {
+  local body_template
+
+  if [[ $argc_type == "Story" ]]; then
+    body_template=$STORY_TEMPLATE
+  elif [[ $argc_type == "Bug" ]]; then
+    body_template=$BUG_TEMPLATE
+  elif [[ $argc_type == "Task" ]]; then
+    body_template=$TASK_TEMPLATE
+  fi
+
+  # Generate a temporary Markdown file with YAML frontmatter
+  local tmpfile
+  tmpfile=$(mktemp ~/tmp/jira_issue_"$(date +%Y%m%d_%H%M%S)".md)
+
+  echo "$ISSUE_FRONTMATTER" >"$tmpfile"
+  echo "$body_template" >>"$tmpfile"
+
+  # Open the file in nvim for editing - position the cursor to start entering the summary
+  nvim +2 "$tmpfile" +"normal 9|"
+
+  # Extract the YAML frontmatter and parse it with yq
+  local edited_yaml_frontmatter
+  edited_yaml_frontmatter=$(awk '/^---/{flag=!flag; next} flag' "$tmpfile")
+
+  local summary
+  local priority
+  local body
+
+  summary=$(echo "$edited_yaml_frontmatter" | yq '.summary')
+  priority=$(echo "$edited_yaml_frontmatter" | yq '.priority')
+
+  # Extract the body content (everything after the YAML frontmatter)
+  body=$(awk 'BEGIN {found=0} /^---/ {found+=1; next} found==2 {print}' "$tmpfile")
+
+  # Validation
+  local valid_priorities=("High" "Medium" "Low")
+  local priority_valid=false
+
+  if [[ -z "$summary" || "$summary" =~ ^[[:space:]]*$ ]]; then
+    echo "Error: Summary must not be empty or contain only spaces." >&2
+    rm "$tmpfile"
+    return 1
+  fi
+
+  for valid_priority in "${valid_priorities[@]}"; do
+    if [[ "$priority" == "$valid_priority" ]]; then
+      priority_valid=true
+      break
+    fi
+  done
+
+  if [[ "$priority_valid" == false ]]; then
+    echo "Error: Priority must be one of: ${valid_priorities[*]}." >&2
+    rm "$tmpfile"
+    return 1
+  fi
+
+  local command_params
+
+  command_params=(-t"$argc_type" -s"$summary" -y"$priority" "--custom team=$JIRA_TEAM")
+
+  if [[ "$argc_sprint" == 1 ]]; then
+    command_params+=("--custom" "sprint=$(get_active_sprint)")
+  elif [[ "$argc_sprint" == 1 && $argc_bust == 1 ]]; then
+    command_params+=("--custom" "sprint=$(get_active_sprint "force")")
+  fi
+
+  if [[ -z "$argc_parent" ]]; then
+    # If argc_parent is blank, just continue
+    :
+  elif [[ "$argc_parent" =~ ^[A-Z]+-[0-9]+$ ]]; then
+    command_params+=("-P$argc_parent")
+  else
+    echo "Error: Invalid JIRA issue or epic key: $argc_parent" >&2
+    exit 1
+  fi
+
+  local command_params_str
+  command_params_str=$(printf '%s ' "${command_params[@]}") # Join array into string
+  command_params_str="${command_params_str% }"              # Remove trailing space
+
+  if [[ "$argc_sprint" == 1 ]]; then
+    echo "$body" | jira issue create $command_params_str --custom sprint=$(get_active_sprint)
+  elif [[ "$argc_sprint" == 1 && $argc_bust == 1 ]]; then
+    echo "$body" | jira issue create $command_params_str --custom sprint=$(get_active_sprint "force")
+  fi
+}
+
+# @cmd Create a new epic
+create::epic() {
+  # Generate a temporary Markdown file with YAML frontmatter
+  local tmpfile
+  tmpfile=$(mktemp ~/tmp/jira_epic_"$(date +%Y%m%d_%H%M%S)".md)
+
+  echo "$EPIC_FRONTMATTER" >"$tmpfile"
+  echo "$EPIC_TEMPLATE" >>"$tmpfile"
+
+  # Open the file in nvim for editing - position the cursor to start entering the summary
+  nvim +2 "$tmpfile" +"normal 9|"
+
+  # Extract the YAML frontmatter and parse it with yq
+  local edited_yaml_frontmatter
+  edited_yaml_frontmatter=$(awk '/^---/{flag=!flag; next} flag' "$tmpfile")
+
+  local name
+  local summary
+  local priority
+  local body
+
+  name=$(echo "$edited_yaml_frontmatter" | yq '.name')
+  summary=$(echo "$edited_yaml_frontmatter" | yq '.summary')
+  priority=$(echo "$edited_yaml_frontmatter" | yq '.priority')
+
+  # Extract the body content (everything after the YAML frontmatter)
+  body=$(awk 'BEGIN {found=0} /^---/ {found+=1; next} found==2 {print}' "$tmpfile")
+
+  # Validation
+  local valid_priorities=("High" "Medium" "Low")
+  local priority_valid=false
+
+  if [[ -z "$name" || "$name" =~ ^[[:space:]]*$ ]]; then
+    echo "Error: Name must not be empty or contain only spaces." >&2
+    rm "$tmpfile"
+    return 1
+  fi
+
+  if [[ -z "$summary" || "$summary" =~ ^[[:space:]]*$ ]]; then
+    echo "Error: Summary must not be empty or contain only spaces." >&2
+    rm "$tmpfile"
+    return 1
+  fi
+
+  for valid_priority in "${valid_priorities[@]}"; do
+    if [[ "$priority" == "$valid_priority" ]]; then
+      priority_valid=true
+      break
+    fi
+  done
+
+  if [[ "$priority_valid" == false ]]; then
+    echo "Error: Priority must be one of: ${valid_priorities[*]}." >&2
+    rm "$tmpfile"
+    return 1
+  fi
+
+  if [[ "$argc_sprint" == 1 ]]; then
+    echo "$body" | jira epic create -n"$name" -s"$summary" -y"$priority" --custom team=$JIRA_TEAM --custom sprint=$(get_active_sprint)
+  elif [[ "$argc_sprint" == 1 && $argc_bust == 1 ]]; then
+    echo "$body" | jira epic create -n"$name" -s"$summary" -y"$priority" --custom team=$JIRA_TEAM --custom sprint=$(get_active_sprint "force")
+  else
+    echo "$body" | jira epic create -n"$name" -s"$summary" -y"$priority" --custom team=$JIRA_TEAM
+  fi
+}
+
+pipe_to_fzf() {
+  local fetch_command="jira issue view"
+  local input
+
+  input=$(cat)
+
+  local issue_keys
+  issue_keys=$(echo "$input" | awk 'NR > 1 {print $1}') # Skip the header and extract the first column (issue keys)
+
+  # Warm the cache for all issue keys in the background
+  echo "$issue_keys" | xargs -n1 -P4 -I{} bkt --ttl=15m --warm -- bash -c "$fetch_command \"{}\""
+
+  echo "$input" | fzf \
+    --layout=reverse \
+    --header-lines=1 \
+    --preview='bkt --ttl=15m --stale=1m -- bash -c "jira issue view {1}" -' \
+    --bind='alt-p:toggle-preview' \
+    --bind='alt-b:preview-up' \
+    --bind='alt-f:preview-down' \
+    --bind='alt-e:execute(jira issue edit {1})' \
+    --bind='alt-o:become(jira open {1})' \
+    --bind='alt-u:become(jira open --no-browser {1} | pbcopy)' \
+    --bind="alt-y:become[jira open --no-browser {1} | awk -F/ '{print \$NF}' | pbcopy ]" \
+    --bind='alt-m:execute(jira issue move {1})' \
+    --bind='alt-c:execute(nvim /tmp/jira_comment.md -c "set ft=markdown" && jira issue comment add {1} < /tmp/jira_comment.md && rm /tmp/jira_comment.md)'
+}
+
+get_filter() {
+  local any_flag="$1"
+
+  # Define an array of assignees
+  local assignees=$JIRA_TEAM_MEMBERS
+
+  if [[ "$any_flag" == "1" ]]; then
+    local assignee_filter
+    assignee_filter=$(printf ',"%s"' "${assignees[@]}")
+    assignee_filter=${assignee_filter:1} # Remove leading comma
+    echo "assignee IN ($assignee_filter)"
+  else
+    echo "assignee = \"$(jira me)\""
+  fi
+}
+
+get_active_sprint() {
+  local force="$1"
+  local cache_file="/tmp/active_sprint_cache.json"
+  local api_url=$JIRA_ACTIVE_SPRINT_URL
+
+  # Check if the cache should be bypassed
+  if [[ "$force" != "force" ]]; then
+    # Check if the cache file exists and is valid
+    if [[ -f "$cache_file" ]]; then
+      local cached_end_date
+      cached_end_date=$(jq -r '.endDate' "$cache_file")
+
+      # Check if the cached end date has not passed
+      if [[ "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" < "$cached_end_date" ]]; then
+        echo "Using cached active sprint:"
+        cat "$cache_file"
+        return
+      fi
+    fi
+  fi
+
+  # Fetch the active sprint from the API
+  local response
+  response=$(curl -s -X GET "$api_url" \
+    -H "Accept: application/json" \
+    -H "Authorization: Basic $JIRA_BEARER_TOKEN")
+
+  # Extract the first sprint from the values array
+  local active_sprint
+  active_sprint=$(echo "$response" | jq '.values[0]')
+
+  # Cache the result
+  echo "$active_sprint" >"$cache_file"
+
+  # Output the active sprint
+  echo "$active_sprint" | jq -r '.id'
+}
+
+eval "$(argc --argc-eval "$0" "$@")"
