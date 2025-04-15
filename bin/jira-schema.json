@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^(?!\\s*$).+"
+    },
+    "summary": {
+      "type": "string",
+      "pattern": "^(?!\\s*$).+"
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["High", "Medium", "Low"]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Backlog",
+        "Refined",
+        "Refinement in progress",
+        "Refinement in review",
+        "Selected for Refinement",
+        "In Review",
+        "Ready for Development",
+        "Done",
+        "Wont do"
+      ]
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "Task",
+        "Sub-task",
+        "Story",
+        "Bug",
+        "Epic",
+        "Spike",
+        "Initiative"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Z]+-[0-9]+$"
+    },
+    "parent": {
+      "type": "string",
+      "pattern": "^[A-Z]+-[0-9]+$"
+    },
+    "sprint": {
+      "type": "boolean"
+    }
+  },
+  "required": ["summary", "priority", "type"],
+  "allOf": [
+    {
+      "if": {
+        "properties": { "type": { "const": "Epic" } }
+      },
+      "then": {
+        "required": ["name"]
+      }
+    }
+  ]
+}

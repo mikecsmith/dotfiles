@@ -32,23 +32,12 @@ TASK_TEMPLATE="**Summary:**
 **When** 
 **Then** "
 
-ISSUE_FRONTMATTER="---
-summary: 
-priority: Medium 
----"
-
 EPIC_TEMPLATE="**Summary:**
 
 **Expected outcome:**
 
 **Goal:**
 "
-
-EPIC_FRONTMATTER="---
-name: 
-summary: 
-priority: Medium 
----"
 
 # @cmd Holding command for show tasks
 # @meta inherit-flag-options
@@ -96,171 +85,136 @@ show::closed() {
 # @meta inherit-flag-options
 # @flag -s --sprint Add the issue to the active sprint
 # @flag -b --bust Bust the cache
+# @option --priority[=Medium|High|Low]
+# @option --type[=Task|Epic|Bug|Story|Sub-task|Initiative] Specify the type of issue to create
+# @option --parent Specify the parent issue
+# @option --status[=Backlog|Refined|Refinement in progress|Refinement in review|Selected for Refinement|In Review|Ready for Development|Done|Wont do]
 create() {
-  :
+  local frontmatter_params
+
+  if [[ "$argc_type" == "Epic" ]]; then
+    frontmatter_params+=("name: ")
+  fi
+
+  frontmatter_params+=(
+    "summary: "
+    "priority: $argc_priority"
+    "type: $argc_type"
+    "status: $argc_status"
+  )
+
+  [[ "$argc_sprint" -eq 1 ]] && frontmatter_params+=("sprint: true")
+
+  if [[ -n "$argc_parent" ]]; then
+    frontmatter_params+=("parent: $argc_parent")
+  fi
+
+  local frontmatter
+  frontmatter=$(build_frontmatter "${frontmatter_params[@]}")
+
+  local tmpfile
+  tmpfile=$(mktemp ~/tmp/jira_epic_"$(date +%Y%m%d_%H%M%S)".md)
+
+  echo "$frontmatter" >"$tmpfile"
+
+  if [[ $argc_type == "Epic" ]]; then
+    echo "$EPIC_TEMPLATE" >>"$tmpfile"
+  elif [[ $argc_type == "Story" ]]; then
+    echo "$STORY_TEMPLATE" >>"$tmpfile"
+  elif [[ $argc_type == "Task" ]]; then
+    echo "$TASK_TEMPLATE" >>"$tmpfile"
+  elif [[ $argc_type == "Bug" ]]; then
+    echo "$BUG_TEMPLATE" >>"$tmpfile"
+  fi
+
+  nvim +2 "$tmpfile" +"normal 9|"
+
+  local yaml
+  yaml=$(awk '/^---/{flag=!flag; next} flag' "$tmpfile")
+
+  local validated_yaml
+  validated_yaml=$(validate_with_schema_and_extract "$HOME/.dotfiles/bin/jira-schema.json" "$yaml")
+
+  local body
+  local name
+  local parent
+  local priority
+  local sprint
+  local status
+  local summary
+  local type
+
+  body=$(awk 'BEGIN {found=0} /^---/ {found+=1; next} found==2 {print}' "$tmpfile")
+  name=$(echo "$validated_yaml" | yq -r '.name')
+  parent=$(echo "$validated_yaml" | yq -r '.parent')
+  priority=$(echo "$validated_yaml" | yq -r '.priority')
+  sprint=$(echo "$validated_yaml" | yq -r '.sprint')
+  status=$(echo "$validated_yaml" | yq -r '.status')
+  summary=$(echo "$validated_yaml" | yq -r '.summary')
+  type=$(echo "$validated_yaml" | yq -r '.type')
+
+  echo "Name: $name"
+  echo "Parent: $parent"
+  echo "Priority: $priority"
+  echo "Sprint: $sprint"
+  echo "Status: $status"
+  echo "Summary: $summary"
+  echo "Type: $type"
+
+  # # shellcheck disable=SC2154,SC2046,SC2086
+  # if [[ "$argc_sprint" == 1 ]]; then
+  #   echo "$body" | jira epic create -n"$name" -s"$summary" -y"$priority" --custom team=$JIRA_TEAM --custom sprint=$(get_active_sprint)
+  # elif [[ "$argc_sprint" == 1 && $argc_bust == 1 ]]; then
+  #   echo "$body" | jira epic create -n"$name" -s"$summary" -y"$priority" --custom team=$JIRA_TEAM --custom sprint=$(get_active_sprint "force")
+  # else
+  #   echo "$body" | jira epic create -n"$name" -s"$summary" -y"$priority" --custom team=$JIRA_TEAM
+  # fi
 }
 
 # @cmd Debug
 debug() {
-  echo "sprint: $(get_active_sprint)"
+  echo "sprint: $(get_active_sprint "force")"
 }
 
-# @cmd Create a new issue
-# @option --type[=Task|Bug|Story] Specify the type of issue to create (e.g., Story, Bug, Task)
-# @option --parent Specify the parent issue or epic for the new issue
-create::issue() {
-  local body_template
+build_frontmatter() {
+  local params=("$@")
+  local frontmatter="---"
 
-  if [[ $argc_type == "Story" ]]; then
-    body_template=$STORY_TEMPLATE
-  elif [[ $argc_type == "Bug" ]]; then
-    body_template=$BUG_TEMPLATE
-  elif [[ $argc_type == "Task" ]]; then
-    body_template=$TASK_TEMPLATE
-  fi
-
-  # Generate a temporary Markdown file with YAML frontmatter
-  local tmpfile
-  tmpfile=$(mktemp ~/tmp/jira_issue_"$(date +%Y%m%d_%H%M%S)".md)
-
-  echo "$ISSUE_FRONTMATTER" >"$tmpfile"
-  echo "$body_template" >>"$tmpfile"
-
-  # Open the file in nvim for editing - position the cursor to start entering the summary
-  nvim +2 "$tmpfile" +"normal 9|"
-
-  # Extract the YAML frontmatter and parse it with yq
-  local edited_yaml_frontmatter
-  edited_yaml_frontmatter=$(awk '/^---/{flag=!flag; next} flag' "$tmpfile")
-
-  local summary
-  local priority
-  local body
-
-  summary=$(echo "$edited_yaml_frontmatter" | yq '.summary')
-  priority=$(echo "$edited_yaml_frontmatter" | yq '.priority')
-
-  # Extract the body content (everything after the YAML frontmatter)
-  body=$(awk 'BEGIN {found=0} /^---/ {found+=1; next} found==2 {print}' "$tmpfile")
-
-  # Validation
-  local valid_priorities=("High" "Medium" "Low")
-  local priority_valid=false
-
-  if [[ -z "$summary" || "$summary" =~ ^[[:space:]]*$ ]]; then
-    echo "Error: Summary must not be empty or contain only spaces." >&2
-    rm "$tmpfile"
-    return 1
-  fi
-
-  for valid_priority in "${valid_priorities[@]}"; do
-    if [[ "$priority" == "$valid_priority" ]]; then
-      priority_valid=true
-      break
+  for param in "${params[@]}"; do
+    if [[ -z "$param" ]]; then
+      continue
     fi
+
+    frontmatter+="
+$param"
   done
 
-  if [[ "$priority_valid" == false ]]; then
-    echo "Error: Priority must be one of: ${valid_priorities[*]}." >&2
-    rm "$tmpfile"
-    return 1
-  fi
+  frontmatter+="
+---"
+  echo -e "$frontmatter"
+}
 
-  local command_params
+validate_with_schema_and_extract() {
+  local schema_file="$1"
+  local input="$2"
 
-  command_params=(-t"$argc_type" -s"$summary" -y"$priority" "--custom team=$JIRA_TEAM")
+  # Create a temporary file for the JSON data
+  local temp_data_file
+  temp_data_file=$(mktemp ~/tmp/jira_frontmatter_xxxx.yml)
 
-  if [[ "$argc_sprint" == 1 ]]; then
-    command_params+=("--custom" "sprint=$(get_active_sprint)")
-  elif [[ "$argc_sprint" == 1 && $argc_bust == 1 ]]; then
-    command_params+=("--custom" "sprint=$(get_active_sprint "force")")
-  fi
+  echo "$input" >"$temp_data_file"
+  echo "$temp_data_file"
+  cat "$temp_data_file"
 
-  if [[ -z "$argc_parent" ]]; then
-    # If argc_parent is blank, just continue
-    :
-  elif [[ "$argc_parent" =~ ^[A-Z]+-[0-9]+$ ]]; then
-    command_params+=("-P$argc_parent")
-  else
-    echo "Error: Invalid JIRA issue or epic key: $argc_parent" >&2
+  # Validate the JSON data using ajv
+  ajv validate -s $schema_file -d $temp_data_file
+  if [ $? -ne 0 ]; then
+    echo "Validation failed. See error above."
     exit 1
   fi
 
-  local command_params_str
-  command_params_str=$(printf '%s ' "${command_params[@]}") # Join array into string
-  command_params_str="${command_params_str% }"              # Remove trailing space
-
-  if [[ "$argc_sprint" == 1 ]]; then
-    echo "$body" | jira issue create $command_params_str --custom sprint=$(get_active_sprint)
-  elif [[ "$argc_sprint" == 1 && $argc_bust == 1 ]]; then
-    echo "$body" | jira issue create $command_params_str --custom sprint=$(get_active_sprint "force")
-  fi
-}
-
-# @cmd Create a new epic
-create::epic() {
-  # Generate a temporary Markdown file with YAML frontmatter
-  local tmpfile
-  tmpfile=$(mktemp ~/tmp/jira_epic_"$(date +%Y%m%d_%H%M%S)".md)
-
-  echo "$EPIC_FRONTMATTER" >"$tmpfile"
-  echo "$EPIC_TEMPLATE" >>"$tmpfile"
-
-  # Open the file in nvim for editing - position the cursor to start entering the summary
-  nvim +2 "$tmpfile" +"normal 9|"
-
-  # Extract the YAML frontmatter and parse it with yq
-  local edited_yaml_frontmatter
-  edited_yaml_frontmatter=$(awk '/^---/{flag=!flag; next} flag' "$tmpfile")
-
-  local name
-  local summary
-  local priority
-  local body
-
-  name=$(echo "$edited_yaml_frontmatter" | yq '.name')
-  summary=$(echo "$edited_yaml_frontmatter" | yq '.summary')
-  priority=$(echo "$edited_yaml_frontmatter" | yq '.priority')
-
-  # Extract the body content (everything after the YAML frontmatter)
-  body=$(awk 'BEGIN {found=0} /^---/ {found+=1; next} found==2 {print}' "$tmpfile")
-
-  # Validation
-  local valid_priorities=("High" "Medium" "Low")
-  local priority_valid=false
-
-  if [[ -z "$name" || "$name" =~ ^[[:space:]]*$ ]]; then
-    echo "Error: Name must not be empty or contain only spaces." >&2
-    rm "$tmpfile"
-    return 1
-  fi
-
-  if [[ -z "$summary" || "$summary" =~ ^[[:space:]]*$ ]]; then
-    echo "Error: Summary must not be empty or contain only spaces." >&2
-    rm "$tmpfile"
-    return 1
-  fi
-
-  for valid_priority in "${valid_priorities[@]}"; do
-    if [[ "$priority" == "$valid_priority" ]]; then
-      priority_valid=true
-      break
-    fi
-  done
-
-  if [[ "$priority_valid" == false ]]; then
-    echo "Error: Priority must be one of: ${valid_priorities[*]}." >&2
-    rm "$tmpfile"
-    return 1
-  fi
-
-  if [[ "$argc_sprint" == 1 ]]; then
-    echo "$body" | jira epic create -n"$name" -s"$summary" -y"$priority" --custom team=$JIRA_TEAM --custom sprint=$(get_active_sprint)
-  elif [[ "$argc_sprint" == 1 && $argc_bust == 1 ]]; then
-    echo "$body" | jira epic create -n"$name" -s"$summary" -y"$priority" --custom team=$JIRA_TEAM --custom sprint=$(get_active_sprint "force")
-  else
-    echo "$body" | jira epic create -n"$name" -s"$summary" -y"$priority" --custom team=$JIRA_TEAM
-  fi
+  # Return the validated JSON data
+  echo "$input"
 }
 
 pipe_to_fzf() {
@@ -270,15 +224,14 @@ pipe_to_fzf() {
   input=$(cat)
 
   local issue_keys
-  issue_keys=$(echo "$input" | awk 'NR > 1 {print $1}') # Skip the header and extract the first column (issue keys)
+  issue_keys=$(echo "$input" | awk 'NR > 1 {print $1}')
 
-  # Warm the cache for all issue keys in the background
   echo "$issue_keys" | xargs -n1 -P4 -I{} bkt --ttl=15m --warm -- bash -c "$fetch_command \"{}\""
 
   echo "$input" | fzf \
     --layout=reverse \
     --header-lines=1 \
-    --preview='bkt --ttl=15m --stale=1m -- bash -c "jira issue view {1}" -' \
+    --preview="bkt --ttl=15m --stale=1m -- bash -c $fetch_command {1} -" \
     --bind='alt-p:toggle-preview' \
     --bind='alt-b:preview-up' \
     --bind='alt-f:preview-down' \
