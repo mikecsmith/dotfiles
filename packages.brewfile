@@ -60,8 +60,3 @@ cask "wezterm"
 
 # Nerd Fonts
 cask "font-meslo-lg-nerd-font"
-
-# Custom Taps
-
-tap "ankitpokhrel/jira-cli"
-brew "jira-cli"
