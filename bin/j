@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -e
+trap 'echo "An error occurred. Exiting..."' ERR
 
 BUG_TEMPLATE="**Bug Details:**
 
@@ -50,35 +52,35 @@ show() {
 show::all() {
   local filter
   filter=$(get_filter "${argc_any:-}")
-  jira issue list --jql "$filter" --plain --columns id,summary,status,reporter,assignee | pipe_to_fzf
+  jira issue list --jql "$filter" --plain --columns id,type,summary,status,reporter,assignee | pipe_to_fzf
 }
 
 # @cmd Show issues in the current sprint
 show::current() {
   local filter
   filter=$(get_filter "${argc_any:-}")
-  jira sprint list --jql "$filter" --table --current --plain --columns=id,summary,status,reporter,assignee | pipe_to_fzf
+  jira sprint list --table --current --plain --columns=id,type,summary,status,reporter,assignee | pipe_to_fzf
 }
 
 # @cmd Show open issues (statuses: Ready for Development, In Progress, In Review)
 show::open() {
   local filter
   filter=$(get_filter "${argc_any:-}")
-  jira issue list --jql "$filter AND status IN ('Ready for Development', 'In Progress', 'In Review')" --plain --columns id,summary,status,reporter,assignee | pipe_to_fzf
+  jira issue list --jql "$filter AND status IN ('Ready for Development', 'In Progress', 'In Review')" --plain --columns id,type,summary,status,reporter,assignee | pipe_to_fzf
 }
 
 # @cmd Show backlog issues (statuses: Backlog, Selected for Refinement, Refinement in progress, Refinement in review, Refined)
 show::backlog() {
   local filter
   filter=$(get_filter "${argc_any:-}")
-  jira issue list --jql "$filter AND status IN ('Backlog', 'Selected for Refinement', 'Refinement in progress', 'Refinement in review', 'Refined')" --plain --columns id,summary,status,reporter,assignee | pipe_to_fzf
+  jira issue list --jql "$filter AND status IN ('Backlog', 'Selected for Refinement', 'Refinement in progress', 'Refinement in review', 'Refined')" --plain --columns id,type,summary,status,reporter,assignee | pipe_to_fzf
 }
 
 # @cmd Show closed issues (statuses: Done, Wont Do)
 show::closed() {
   local filter
   filter=$(get_filter "${argc_any:-}")
-  jira issue list --jql "$filter AND status IN ('Done', 'Wont Do')" --plain --columns id,summary,status | pipe_to_fzf
+  jira issue list --jql "$filter AND status IN ('Done', 'Wont Do')" --plain --columns id,type,summary,status,reporter,assignee | pipe_to_fzf
 }
 
 # @cmd Holding command for create tasks
@@ -92,6 +94,7 @@ show::closed() {
 create() {
   local frontmatter_params
 
+  # shellcheck disable=SC2154,SC2046,SC2086
   if [[ "$argc_type" == "Epic" ]]; then
     frontmatter_params+=("name: ")
   fi
@@ -103,6 +106,7 @@ create() {
     "status: $argc_status"
   )
 
+  # shellcheck disable=SC2154,SC2046,SC2086
   [[ "$argc_sprint" -eq 1 ]] && frontmatter_params+=("sprint: true")
 
   if [[ -n "$argc_parent" ]]; then
@@ -113,7 +117,7 @@ create() {
   frontmatter=$(build_frontmatter "${frontmatter_params[@]}")
 
   local tmpfile
-  tmpfile=$(mktemp ~/tmp/jira_epic_"$(date +%Y%m%d_%H%M%S)".md)
+  tmpfile=$(mktemp ~/tmp/jira_create_"$(date +%Y%m%d_%H%M%S)".md)
 
   echo "$frontmatter" >"$tmpfile"
 
@@ -127,13 +131,13 @@ create() {
     echo "$BUG_TEMPLATE" >>"$tmpfile"
   fi
 
-  nvim +2 "$tmpfile" +"normal 9|"
+  nvim +2 "$tmpfile"
 
   local yaml
   yaml=$(awk '/^---/{flag=!flag; next} flag' "$tmpfile")
 
   local validated_yaml
-  validated_yaml=$(validate_with_schema_and_extract "$HOME/.dotfiles/bin/jira-schema.json" "$yaml")
+  validated_yaml=$(validate_with_schema "$HOME/.dotfiles/bin/jira-schema.json" "$yaml")
 
   local body
   local name
@@ -153,27 +157,80 @@ create() {
   summary=$(echo "$validated_yaml" | yq -r '.summary')
   type=$(echo "$validated_yaml" | yq -r '.type')
 
-  echo "Name: $name"
-  echo "Parent: $parent"
-  echo "Priority: $priority"
-  echo "Sprint: $sprint"
-  echo "Status: $status"
-  echo "Summary: $summary"
-  echo "Type: $type"
+  # Build Jira CLI command parameters
+  local jira_params=()
 
-  # # shellcheck disable=SC2154,SC2046,SC2086
-  # if [[ "$argc_sprint" == 1 ]]; then
-  #   echo "$body" | jira epic create -n"$name" -s"$summary" -y"$priority" --custom team=$JIRA_TEAM --custom sprint=$(get_active_sprint)
-  # elif [[ "$argc_sprint" == 1 && $argc_bust == 1 ]]; then
-  #   echo "$body" | jira epic create -n"$name" -s"$summary" -y"$priority" --custom team=$JIRA_TEAM --custom sprint=$(get_active_sprint "force")
-  # else
-  #   echo "$body" | jira epic create -n"$name" -s"$summary" -y"$priority" --custom team=$JIRA_TEAM
-  # fi
+  add_param_if_valid() {
+    local param="$1"
+    local value="$2"
+    if [[ -n "$value" && "$value" != "null" ]]; then
+      jira_params+=("$param" "$value")
+    fi
+  }
+
+  # Add basic parameters
+  if [[ "$type" == "Epic" ]]; then
+    add_param_if_valid "--name" "$name"
+  else
+    add_param_if_valid "--type" "$type"
+    add_param_if_valid "--parent" "$parent"
+  fi
+
+  # Add common parameters - wrap summary in quotes to handle spaces
+  add_param_if_valid "--summary" "$summary"
+  add_param_if_valid "--priority" "$priority"
+
+  # Add custom fields
+  if [[ -n "$JIRA_TEAM" ]]; then
+    jira_params+=("--custom" "team=$JIRA_TEAM")
+  fi
+
+  # Add sprint if specified
+  if [[ "$sprint" == "true" ]]; then
+    local sprint_id
+    # shellcheck disable=SC2154,SC2046,SC2086
+    if [[ "$argc_bust" == "1" ]]; then
+      sprint_id=$(get_active_sprint "force")
+    else
+      sprint_id=$(get_active_sprint)
+    fi
+    jira_params+=("--custom" "sprint=$sprint_id")
+  fi
+
+  # Add --raw flag to get JSON output
+  jira_params+=("--raw")
+
+  echo "Creating $type in Jira... with ${jira_params[*]}"
+  local jira_output
+
+  if [[ "$type" == "Epic" ]]; then
+    jira_output=$(echo "$body" | jira epic create "${jira_params[@]}" 2>&1)
+  else
+    jira_output=$(echo "$body" | jira issue create "${jira_params[@]}" 2>&1)
+  fi
+
+  [[ "$J_DEBUG" = "1" ]] && echo "$jira_output"
+
+  # Extract the issue key from the JSON response if available
+  if [[ "$jira_output" =~ \{.*\"key\":\"([^\"]+)\".*\} ]]; then
+    local issue_key="${BASH_REMATCH[1]}"
+    echo "Created issue: $issue_key"
+    echo "URL: $(jira open --no-browser "$issue_key")"
+    # Transition the issue if status is provided and not Backlog
+    if [[ -n "$status" && "$status" != "null" && "$status" != "Backlog" ]]; then
+      echo "Transitioning $issue_key to status: $status"
+      jira issue move "$issue_key" "$status" || {
+        echo "Warning: Could not transition issue to '$status'. The issue was created successfully."
+      }
+    fi
+  fi
 }
 
 # @cmd Debug
+# @flag -a --any Show issues from any user (removes -a$(jira me) filter)
 debug() {
   echo "sprint: $(get_active_sprint "force")"
+  echo "get_filter: $(get_filter "${argc_any:-}")"
 }
 
 build_frontmatter() {
@@ -194,27 +251,42 @@ $param"
   echo -e "$frontmatter"
 }
 
-validate_with_schema_and_extract() {
+validate_with_schema() {
   local schema_file="$1"
   local input="$2"
 
+  [[ "$J_DEBUG" = "1" ]] && echo "DEBUG: Starting validation..." >&2
+  [[ "$J_DEBUG" = "1" ]] && echo "DEBUG: Schema file: $schema_file" >&2
+  [[ "$J_DEBUG" = "1" ]] && echo "DEBUG: Input length: ${#input}" >&2
+
   # Create a temporary file for the JSON data
   local temp_data_file
-  temp_data_file=$(mktemp ~/tmp/jira_frontmatter_xxxx.yml)
+  temp_data_file=$(mktemp "$HOME/tmp/jira_frontmatter.yml")
+  [[ "$J_DEBUG" = "1" ]] && echo "DEBUG: Temp file created: $temp_data_file" >&2
 
-  echo "$input" >"$temp_data_file"
-  echo "$temp_data_file"
-  cat "$temp_data_file"
-
-  # Validate the JSON data using ajv
-  ajv validate -s $schema_file -d $temp_data_file
-  if [ $? -ne 0 ]; then
-    echo "Validation failed. See error above."
-    exit 1
+  if [ ! -f "$temp_data_file" ]; then
+    echo "Failed to create temporary file with mktemp: $temp_data_file" >&2
+    return 1
   fi
 
-  # Return the validated JSON data
-  echo "$input"
+  # Write input to temp file
+  echo "$input" >"$temp_data_file"
+  [[ "$J_DEBUG" = "1" ]] && echo "DEBUG: Wrote input to temp file" >&2
+
+  # Try basic cat of the file to verify it exists
+  [[ "$J_DEBUG" = "1" ]] && echo "DEBUG: File contents:" >&2
+  [[ "$J_DEBUG" = "1" ]] && cat "$temp_data_file" >&2
+
+  # Run jsonschema and explicitly capture result
+  [[ "$J_DEBUG" = "1" ]] && echo "DEBUG: Running jsonschema..." >&2
+  jsonschema validate "$schema_file" "$temp_data_file" >&2
+  local result=$?
+  [[ "$J_DEBUG" = "1" ]] && echo "DEBUG: jsonschema exit code: $result" >&2
+
+  # Return the file contents and clean up
+  cat "$temp_data_file"
+  rm -f "$temp_data_file"
+  return $result
 }
 
 pipe_to_fzf() {
@@ -226,15 +298,24 @@ pipe_to_fzf() {
   local issue_keys
   issue_keys=$(echo "$input" | awk 'NR > 1 {print $1}')
 
+  local me
+  me=$(jira me)
+
   echo "$issue_keys" | xargs -n1 -P4 -I{} bkt --ttl=15m --warm -- bash -c "$fetch_command \"{}\""
 
   echo "$input" | fzf \
+    --ansi \
+    --border \
+    --padding 1,2 \
+    --border-label ' Issues ' --input-label ' Search ' \
     --layout=reverse \
     --header-lines=1 \
-    --preview="bkt --ttl=15m --stale=1m -- bash -c $fetch_command {1} -" \
+    --preview-window=top:60%:wrap \
+    --preview="bkt --ttl=15m --stale=1m -- bash -c \"$fetch_command {1}\" | glow --pager never -s dark" \
     --bind='alt-p:toggle-preview' \
     --bind='alt-b:preview-up' \
     --bind='alt-f:preview-down' \
+    --bind="alt-a:execute(jira issue assign {1} $me)" \
     --bind='alt-e:execute(jira issue edit {1})' \
     --bind='alt-o:become(jira open {1})' \
     --bind='alt-u:become(jira open --no-browser {1} | pbcopy)' \
@@ -246,10 +327,10 @@ pipe_to_fzf() {
 get_filter() {
   local any_flag="$1"
 
-  # Define an array of assignees
-  local assignees=$JIRA_TEAM_MEMBERS
-
   if [[ "$any_flag" == "1" ]]; then
+    local assignees
+    read -r -a assignees <<<"${JIRA_TEAM_MEMBERS//,/ }"
+
     local assignee_filter
     assignee_filter=$(printf ',"%s"' "${assignees[@]}")
     assignee_filter=${assignee_filter:1} # Remove leading comma
