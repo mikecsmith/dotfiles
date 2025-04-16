@@ -33,6 +33,7 @@ brew "ripgrep"
 brew "sqlcmd"
 brew "stow"
 brew "tilt"
+brew "tlrc" # tldr package
 brew "tree"
 brew "unixodbc"
 brew "vivid" # Colorizer for LS_COLORS
