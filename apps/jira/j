@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -e
+trap 'echo "An error occurred. Exiting..."' ERR
+
+# TODO: Write a bootstrap script that moves schemas and
+# a base config file to XDG_CONFIG HOME, It should also
+# copy subcommands and utils into XDG_DATA_HOME then update
+# the J_ variables.
+
+# export J_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/j"
+# export J_UTILS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/j/utils"
+
+export J_CONFIG_DIR="${HOME}/.dotfiles/apps/jira/"
+export J_UTILS_DIR="${HOME}/.dotfiles/apps/jira/utils"
+export J_SCHEMAS_DIR="${HOME}/.dotfiles/apps/jira/schemas"
+export J_SUBCOMMANDS_DIR="${HOME}/.dotfiles/apps/jira/subcommands"
+
+# @cmd Show issues
+# @arg args~
+show() {
+  "$J_SUBCOMMANDS_DIR/show.sh" "$@"
+}
+
+# @cmd Create an issue
+# @arg args~
+create() {
+  "$J_SUBCOMMANDS_DIR/create.sh" "$@"
+}
+
+eval "$(argc --argc-eval "$0" "$@")"
