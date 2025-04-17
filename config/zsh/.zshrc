@@ -100,6 +100,8 @@ if [ -f ~/.zsh_secrets ]; then
     source ~/.zsh_secrets
 fi
 
+export IS_FAST_CONFIG_PATH="$XDG_CONFIG_HOME/is-fast/config.toml"
+
 
 # ============================================================================
 # Useful Aliases
