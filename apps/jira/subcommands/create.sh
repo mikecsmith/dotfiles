@@ -27,7 +27,6 @@ fi
 
 frontmatter_params+=(
   "summary: "
-  "priority: $argc_priority"
   "type: $argc_type"
   "status: $argc_status"
 )

@@ -28,5 +28,6 @@ pipe_to_fzf() {
     --bind='alt-u:become(jira open --no-browser {1} | pbcopy)' \
     --bind="alt-y:become[jira open --no-browser {1} | awk -F/ '{print \$NF}' | pbcopy ]" \
     --bind='alt-m:execute(jira issue move {1})' \
+    --bind='alt-n:execute(echo {+} | cut -f1,3 | tr "\t" "-" | tr "[:upper:]" "[:lower:]" | sed "s/ /-/g" | sed "s/[^a-z0-9-]//g" | xargs -I{} echo "git checkout -b {}" | pbcopy)' \
     --bind='alt-c:execute(nvim /tmp/jira_comment.md -c "set ft=markdown" && jira issue comment add {1} < /tmp/jira_comment.md && rm /tmp/jira_comment.md)'
 }

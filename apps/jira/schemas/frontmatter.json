@@ -53,7 +53,7 @@
       "type": "boolean"
     }
   },
-  "required": ["summary", "priority", "type"],
+  "required": ["summary", "status", "type"],
   "allOf": [
     {
       "if": {
