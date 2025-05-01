@@ -15,11 +15,6 @@ return {
 ]],
         },
       },
-    },
-  },
-  {
-    "folke/snacks.nvim",
-    opts = {
       image = {},
     },
   },
@@ -62,6 +57,12 @@ return {
         desc = "Move right a Split",
         mode = { "n" },
       },
+    },
+  },
+  {
+    "pwntester/octo.nvim",
+    opts = {
+      picker = "snacks",
     },
   },
 }
