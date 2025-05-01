@@ -206,7 +206,7 @@ fg = "Gray"
 [headers]
 "Accept" = "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
 "Accept-Language" = "en-US,en;q=0.9"
-"User-Agent" = "Lynx/2.8.8dev.3 libwww-FM/2.14 SSL-MM/1.4.1"
+"User-Agent" = "curl/7.79.1"
 
 
 [format]
