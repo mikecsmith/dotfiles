@@ -5,8 +5,6 @@ ENTRIES=(
   "/Applications/Slack.app/|apps|"
   "/Applications/Arc.app/|apps|"
   "/Applications/kitty.app/|apps|"
-  "/Applications/WezTerm.app/|apps|"
-  "/Applications/Alacritty.app/|apps|"
   "/Applications/Bruno.app/|apps|"
 )
 
