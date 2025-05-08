@@ -3,9 +3,6 @@ export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_CACHE_HOME="$HOME/.cache"
 
-# Set ZDOTDIR to use the XDG configuration path for Zsh config
-export ZDOTDIR="$XDG_CONFIG_HOME/zsh"
-
 # Set the history file location
 export HISTFILE="$XDG_DATA_HOME/zsh/.zsh_history"
 
