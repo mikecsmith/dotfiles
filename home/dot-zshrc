@@ -77,9 +77,9 @@ export PATH=$(brew --prefix)/opt/libpq/bin:$PATH
 export PATH=$HOME/.pnpm-packages/bin:$HOME/.pnpm-packages:$PATH
 export PATH=$HOME/.npm-packages/bin:$HOME/bin:$PATH
 export PATH=$HOME/.local/bin:$PATH
-export PATH=/opt/homebrew/bin:$PATH
 export PATH=$PATH:$HOME/.cargo/bin
 export PATH=$PATH:$HOME/.luarocks/bin
+export PATH=$PATH:/opt/homebrew/bin
 
 # ============================================================================
 # Environment Variables
