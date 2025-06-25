@@ -12,10 +12,7 @@ return {
         enabled = true, -- this might change to false in the future
       },
       indent_hints = {
-        -- enable hints for indent and nindent functions
-        enabled = true,
-        -- show the hints only for the line the cursor is on
-        only_for_current_line = true,
+        enabled = false,
       },
     },
   },
@@ -45,7 +42,7 @@ return {
                 initTimeoutSeconds = 3,
                 config = {
                   schemas = {
-                    ["https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v1.32.1-standalone-strict/all.json"] = "templates/**",
+                    kubernetes = "templates/**",
                   },
                   completion = true,
                   hover = true,
@@ -66,11 +63,9 @@ return {
       },
       setup = {
         helm_ls = function()
-          if vim.fn.has("nvim-0.10") == 0 then
-            LazyVim.lsp.on_attach(function(client, _)
-              client.server_capabilities.documentFormattingProvider = true
-            end, "helm-ls")
-          end
+          LazyVim.lsp.on_attach(function(client, _)
+            client.server_capabilities.documentFormattingProvider = true
+          end, "helm-ls")
         end,
         yamlls = function()
           -- Prevent yamlls from attaching to Helm-related filetypes
