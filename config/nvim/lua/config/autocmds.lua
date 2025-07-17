@@ -99,3 +99,11 @@ vim.api.nvim_create_autocmd("LspAttach", {
     vim.g.lazyvim_prettier_needs_config = denols_attached
   end,
 })
+
+-- Register starlark parser for tiltfile filetype
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "tiltfile",
+  callback = function()
+    vim.treesitter.language.register("starlark", "tiltfile")
+  end,
+})
