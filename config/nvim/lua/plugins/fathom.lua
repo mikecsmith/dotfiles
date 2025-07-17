@@ -1,3 +1,5 @@
+vim.api.nvim_set_hl(0, "VisualNonText", { fg = "#5D5F71", bg = "#24282d" })
+
 return {
   { "folke/noice.nvim", enabled = false },
   {
@@ -64,5 +66,11 @@ return {
     opts = {
       picker = "snacks",
     },
+  },
+  {
+    "mcauley-penney/visual-whitespace.nvim",
+    config = true,
+    event = "ModeChanged *:[vV\22]", -- optionally, lazy load on entering visual mode
+    opts = {},
   },
 }
