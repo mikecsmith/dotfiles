@@ -10,7 +10,6 @@ return {
     opts = {
       ensure_installed = {
         "deno",
-        "spectral-language-server",
       },
     },
   },
@@ -61,18 +60,5 @@ return {
         },
       },
     },
-  },
-  {
-    "mfussenegger/nvim-lint",
-    opts = {
-      linters = {
-        spectral = {},
-      },
-    },
-  },
-  { "markemmons/neotest-deno" },
-  {
-    "nvim-neotest/neotest",
-    opts = { adapters = { "neotest-deno" } },
   },
 }
