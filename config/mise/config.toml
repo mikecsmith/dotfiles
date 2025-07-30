@@ -1,13 +1,14 @@
 [tools]
 # global tool versions go here
 
-deno = '2'
-go = '1.22'
+deno = 'latest'
+go = 'latest'
 gradle = '8.9'
 java = "corretto-21"
 julia = 'latest'
 kind = 'latest'
 kubectl = 'latest'
+kustomize = 'latest'
 helm = 'latest'
 lua = '5.1'
 node = 'lts'
@@ -15,7 +16,7 @@ pnpm = '10'
 python = "3.12.6"
 quarkus = '3.14.1'
 scala = 'latest'
-kustomize = "5.6.0"
+terraform = 'latest'
 
 [settings]
 
