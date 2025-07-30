@@ -22,10 +22,7 @@ case "$response" in
   ;;
 esac
 
-if ! command -v gh >/dev/null 2>&1; then
-  echo "GitHub CLI (gh) is not installed. Please install it and authenticate with the correct scopes (read:packages, write:packages, read:projects as a minimum)."
-  exit 1
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/shared/github.sh"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker is not installed."
