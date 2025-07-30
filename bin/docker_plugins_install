@@ -1,0 +1,55 @@
+#!/usr/bin/env zsh
+
+# vim: set filetype=sh :
+
+echo "This script will:"
+echo "  - Check if the GitHub CLI (gh) is installed and authenticated"
+echo "  - Retrieve the correct versions of Docker Buildx and Docker Compose for your system architecture"
+echo "  - Install them into the Docker CLI plugins directory"
+echo
+echo "Requirements:"
+echo "  - GitHub CLI (gh) installed and authenticated"
+echo
+read -r -p "Continue? [y/N] " response
+
+case "$response" in
+[yY][eE][sS] | [yY]) ;;
+*)
+  echo "Aborted."
+  exit 1
+  ;;
+esac
+
+if ! command -v gh >/dev/null 2>&1; then
+  echo "GitHub CLI (gh) is not installed. Please install it and authenticate with the correct scopes - minimally: gh auth login -s read:projects,write:packages,read:packages"
+  exit 1
+fi
+
+DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}
+
+ARCH="$(uname -m)"
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+  BUILDX_SUFFIX='darwin-arm64'
+  COMPOSE_FILE='docker-compose-darwin-aarch64'
+elif [ "$ARCH" = "x86_64" ] || [ "$ARCH" = "amd64" ]; then
+  BUILDX_SUFFIX='darwin-amd64'
+  COMPOSE_FILE='docker-compose-darwin-x86_64'
+else
+  echo "Unsupported architecture: $ARCH"
+  exit 1
+fi
+
+rm *.$RELEASE_FILE_SUFFIX $COMPOSE_FILE
+gh release download --repo 'github.com/docker/buildx' --pattern "*.$BUILDX_SUFFIX"
+gh release download --repo 'github.com/docker/compose' --pattern "$COMPOSE_FILE"
+
+mkdir -p ~/.docker/cli-plugins
+mv -f *.$BUILDX_SUFFIX $DOCKER_CONFIG/cli-plugins/docker-buildx
+mv -f $COMPOSE_FILE $DOCKER_CONFIG/cli-plugins/docker-compose
+chmod +x $DOCKER_CONFIG/cli-plugins/docker-buildx
+chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
+
+docker buildx version
+docker compose version
+
+# Modified from: https://github.com/fullheart/my-dev-env/blob/main/osx/docker/colima/install_latest_buildx.sh

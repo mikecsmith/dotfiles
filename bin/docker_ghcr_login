@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+# vim: set filetype=sh :
+
+set -euo pipefail
+
+echo "This script will:"
+echo "  - Check if the GitHub CLI (gh) is installed and authenticated"
+echo "  - Log docker in to GitHub Container Registry (ghcr.io) using your GitHub Personal Access Token (PAT)"
+echo
+echo "Requirements:"
+echo "  - GitHub CLI (gh) installed and authenticated"
+echo "  - Docker CLI installed"
+echo
+read -r -p "Continue? [y/N] " response
+
+case "$response" in
+[yY][eE][sS] | [yY]) ;;
+*)
+  echo "Aborted."
+  exit 1
+  ;;
+esac
+
+if ! command -v gh >/dev/null 2>&1; then
+  echo "GitHub CLI (gh) is not installed. Please install it and authenticate with the correct scopes (read:packages, write:packages, read:projects as a minimum)."
+  exit 1
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Docker is not installed."
+  exit 1
+fi
+
+GH_TOKEN="$(gh auth token 2>/dev/null)"
+GH_USER="$(gh api user --jq .login 2>/dev/null)"
+
+if [ -z "$GH_TOKEN" ] || [ -z "$GH_USER" ]; then
+  echo "Could not retrieve GitHub username or token using gh CLI. Please authenticate with 'gh auth login'."
+  exit 1
+fi
+
+echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin

@@ -1,0 +1,117 @@
+#!/usr/env/bin bash
+
+# vim: set filetype=sh :
+
+set -euo pipefail
+
+PROFILE="${1:-default}"
+
+echo "This script will:"
+echo "  - Ensure colima.yaml exists for profile: $PROFILE (creating from template if missing)"
+echo "  - Detect system architecture and update relevant keys in colima.yaml"
+echo "  - Ensure Docker socket is symlinked to /var/run/docker.sock"
+echo "  - Export CA certificates to ~/.docker/certs.d/root_certs.crt"
+echo "  - Include a provision block in colima.yaml to update CA certificates"
+echo "  - Assign a network address to the colima.yaml"
+echo
+echo "WARNING: This script will modify your colima.yaml file and restart Colima."
+echo
+read -r -p "Continue? [y/N] " response
+
+case "$response" in
+[yY][eE][sS] | [yY]) ;;
+*)
+  echo "Aborted."
+  exit 1
+  ;;
+esac
+
+if ! command -v colima >/dev/null 2>&1; then
+  echo "Colima is not installed. Please install Colima and try again."
+  exit 1
+fi
+
+if [ -d "$HOME/.config/colima" ]; then
+  COLIMA_BASE="$HOME/.config/colima"
+else
+  COLIMA_BASE="$HOME/.colima"
+fi
+
+CONFIG_PATH="$COLIMA_BASE/$PROFILE/colima.yaml"
+
+if [ ! -S /var/run/docker.sock ]; then
+  DOCKER_HOST_PATH="$COLIMA_BASE/$PROFILE/docker.sock"
+  if [ -n "$DOCKER_HOST_PATH" ] && [ -S "$DOCKER_HOST_PATH" ]; then
+    echo "Symlinking $DOCKER_HOST_PATH to /var/run/docker.sock"
+    sudo ln -sf "$DOCKER_HOST_PATH" /var/run/docker.sock
+  else
+    echo "No valid Docker socket found - have you setup a Colima profile?"
+    exit 1
+  fi
+else
+  echo "/var/run/docker.sock already exists."
+fi
+
+ARCH="$(uname -m)"
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+  YAML_ARCH="aarch64"
+  YAML_VM_TYPE="vz"
+  YAML_ROSETTA="true"
+elif [ "$ARCH" = "x86_64" ] || [ "$ARCH" = "amd64" ]; then
+  YAML_ARCH="x86_64"
+  YAML_VM_TYPE="qemu"
+  YAML_ROSETTA="false"
+else
+  echo "Unsupported architecture: $ARCH"
+  exit 1
+fi
+
+mkdir -p ~/.docker/certs.d/
+
+security find-certificate -a -p /System/Library/Keychains/SystemRootCertificates.keychain >~/.docker/certs.d/root_certs.crt
+security find-certificate -a -p /Library/Keychains/System.keychain >>~/.docker/certs.d/root_certs.crt
+
+PROVISION_BLOCK="
+provision:
+  - mode: system
+    script: |
+      CERTS=\"/Users/$(whoami)/.docker/certs.d/\"
+      cp \${CERTS}/* /usr/local/share/ca-certificates/
+      update-ca-certificates
+      systemctl daemon-reload
+      systemctl restart docker
+"
+
+# Create a default colima.yaml if it doesn't exist
+if [ ! -f "$CONFIG_PATH" ]; then
+  mkdir -p "$(dirname "$CONFIG_PATH")"
+  colima template >"$CONFIG_PATH"
+  echo "Created new colima.yaml from colima template."
+fi
+
+# Update the colima.yaml with optimised values
+sed -i.bak \
+  -e "s/^arch: .*/arch: $YAML_ARCH/" \
+  -e "s/^vmType: .*/vmType: $YAML_VM_TYPE/" \
+  -e "s/^rosetta: .*/rosetta: $YAML_ROSETTA/" \
+  -e "/^network:/,/^[^ ]/ s/^  address: .*/  address: true/" \
+  "$CONFIG_PATH"
+
+# Update the provision block to add certs
+if grep -q "^provision: \[\]" "$CONFIG_PATH"; then
+  sed -i.bak '/^provision: \[\]/d' "$CONFIG_PATH"
+  echo "$PROVISION_BLOCK" >>"$CONFIG_PATH"
+  echo "Replaced 'provision: []' with provision block in colima.yaml"
+elif ! grep -q "provision:" "$CONFIG_PATH"; then
+  echo "$PROVISION_BLOCK" >>"$CONFIG_PATH"
+  echo "Provision block appended to existing colima.yaml"
+else
+  echo "Provision block already exists in colima.yaml, not modifying."
+fi
+
+echo "Updated architecture and network settings in colima.yaml - restarting"
+
+colima stop
+colima start
+
+echo "Certificates exported and Colima configured and restarted"

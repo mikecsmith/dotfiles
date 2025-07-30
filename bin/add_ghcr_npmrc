@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+
+# vim: set filetype=sh :
+
+set -euo pipefail
+
+echo "This script will:"
+echo "  - Check if the GitHub CLI (gh) is installed and authenticated"
+echo "  - Retrieve your GitHub Personal Access Token (PAT) using gh"
+echo "  - Only update ~/.npmrc if changes are needed"
+echo
+echo "Requirements:"
+echo "  - GitHub CLI (gh) installed and authenticated with a PAT that has 'read:packages' scope"
+echo
+read -r -p "Continue? [y/N] " response
+
+case "$response" in
+[yY][eE][sS] | [yY]) ;;
+*)
+  echo "Aborted."
+  exit 1
+  ;;
+esac
+
+NPMRC="$HOME/.npmrc"
+
+if ! command -v gh >/dev/null 2>&1; then
+  echo "GitHub CLI (gh) is not installed. Please install it and authenticate with the correct scopes - minimally: gh auth login -s read:projects,write:packages,read:packages"
+  exit 1
+fi
+
+GH_TOKEN="$(gh auth token 2>/dev/null)"
+if [ -z "$GH_TOKEN" ]; then
+  echo "Could not retrieve a GitHub token using gh CLI. Please authenticate with 'gh auth login'."
+  exit 1
+fi
+
+AUTH_LINE="//npm.pkg.github.com/:_authToken=${GH_TOKEN}"
+
+CURRENT_TOKEN="$(grep '//npm.pkg.github.com/:_authToken=' "$NPMRC" 2>/dev/null | sed 's/.*=//')"
+
+CHANGED=0
+
+if [ "$CURRENT_TOKEN" != "$GH_TOKEN" ]; then
+  sed -i.bak '/^\/\/npm\.pkg\.github\.com\/:_authToken=/d' "$NPMRC" 2>/dev/null || true
+  rm -f "$NPMRC.bak"
+  echo "$AUTH_LINE" >>"$NPMRC"
+  CHANGED=1
+fi
+
+if [ "$CHANGED" -eq 0 ]; then
+  echo "No changes needed: .npmrc already contains the correct token and registry."
+else
+  echo "Updated $NPMRC with the correct GitHub token and registry."
+fi
