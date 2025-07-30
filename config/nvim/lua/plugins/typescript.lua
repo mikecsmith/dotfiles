@@ -5,25 +5,57 @@ local get_root_dir = function(fname)
 end
 
 return {
-  "neovim/nvim-lspconfig",
-  opts = {
-    servers = {
-      denols = {
-        filetypes = { "typescript", "typescriptreact" },
-        root_dir = function(fname)
-          return util.root_pattern("deno.jsonc", "deno.json")(fname)
-        end,
+  {
+    "williamboman/mason.nvim",
+    opts = {
+      ensure_installed = {
+        "deno",
+        "spectral-language-server",
       },
-      eslint = {
-        root_dir = get_root_dir,
-      },
-      vtsls = {
-        root_dir = get_root_dir,
-        settings = {
-          typescript = {
-            compilerOptions = {
-              customConditions = "typescript",
-              moduleResolution = "nodenext",
+    },
+  },
+  {
+    "neovim/nvim-lspconfig",
+    opts = {
+      servers = {
+        denols = {
+          root_dir = function(fname)
+            return util.root_pattern("deno.json", "deno.jsonc")(fname)
+          end,
+          settings = {
+            typescript = {
+              inlayHints = {
+                parameterNames = {
+                  enabled = "literals",
+                },
+                variableTypes = {
+                  enabled = true,
+                },
+                enumMemberValues = {
+                  enabled = true,
+                },
+              },
+            },
+            deno = {
+              codeLens = {
+                implementations = true,
+                references = true,
+                test = true,
+              },
+            },
+          },
+        },
+        eslint = {
+          root_dir = get_root_dir,
+        },
+        vtsls = {
+          root_dir = get_root_dir,
+          settings = {
+            typescript = {
+              compilerOptions = {
+                customConditions = "typescript",
+                moduleResolution = "nodenext",
+              },
             },
           },
         },
@@ -38,10 +70,9 @@ return {
       },
     },
   },
+  { "markemmons/neotest-deno" },
   {
-    "mason-org/mason.nvim",
-    opts = {
-      ensure_installed = { "spectral-language-server" },
-    },
+    "nvim-neotest/neotest",
+    opts = { adapters = { "neotest-deno" } },
   },
 }
