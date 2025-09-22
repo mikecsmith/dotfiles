@@ -1,6 +1,11 @@
 return {
   {
+    "blink-cmp-copilot",
+    enabled = false,
+  },
+  {
     "saghen/blink.cmp",
+    dependencies = { "fang2hou/blink-copilot" },
     opts = {
       keymap = {
         ["<Tab>"] = {
@@ -20,6 +25,12 @@ return {
         },
         providers = {
           dadbod = { name = "Dadbod", module = "vim_dadbod_completion.blink" },
+          copilot = {
+            name = "copilot",
+            module = "blink-copilot",
+            score_offset = 100,
+            async = true,
+          },
         },
       },
     },
