@@ -142,3 +142,4 @@ if type brew &>/dev/null; then
   ZSH_AUTOSUGGEST_CLEAR_WIDGETS=(accept-line copy-earlier-word)
   source "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" # Must be last thing sourced
 fi
+
