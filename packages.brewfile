@@ -25,7 +25,7 @@ brew "kompose"
 brew "lazygit"
 brew "libpq"
 brew "mise"
-brew "nvim"
+brew "nvim", args: ["--HEAD"]
 brew "p7zip"
 brew "parallel"
 brew "pandoc"

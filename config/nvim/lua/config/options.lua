@@ -10,3 +10,6 @@ vim.filetype.add({
     ["Tiltfile.*"] = "tiltfile",
   },
 })
+
+vim.g.ai_cmp = false
+vim.g.lazyvim_blink_main = true
