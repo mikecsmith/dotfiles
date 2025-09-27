@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 DOTFILES_DIR="$HOME/.dotfiles" # No external overriding, directly define it
 cd "$DOTFILES_DIR" || exit

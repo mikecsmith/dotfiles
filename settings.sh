@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Set defaults for NSGlobalDomain
 defaults write NSGlobalDomain AppleShowAllExtensions -bool true         # Show all file extensions in Finder

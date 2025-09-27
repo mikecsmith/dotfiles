@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Create directories for XDG Base Directory Specification
 mkdir -p "$HOME/.config"
