@@ -2,6 +2,7 @@
 
 # Formulae
 brew "awscli"
+brew "bash"
 brew "bat"
 brew "bkt"
 brew "btop"
