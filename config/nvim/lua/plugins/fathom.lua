@@ -79,4 +79,17 @@ return {
     event = "ModeChanged *:[vV\22]", -- optionally, lazy load on entering visual mode
     opts = {},
   },
+  {
+    "Wansmer/treesj",
+    keys = { { "J", "<cmd>TSJToggle<cr>", desc = "Join Toggle" } },
+    opts = { use_default_keymaps = false, max_join_length = 150 },
+  },
+  {
+    "folke/ts-comments.nvim",
+    opts = {
+      langs = {
+        dts = "// %s",
+      },
+    },
+  },
 }
