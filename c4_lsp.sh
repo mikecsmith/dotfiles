@@ -4,7 +4,7 @@
 REPO_URL="https://gitlab.com/systemticks/c4-dsl-language-server"
 TARGET_DIR="$HOME/.local/share/lsp-servers/c4-dsl-language-server"
 if [ -d "$TARGET_DIR" ]; then
-  rm -rf "$TARGET_DIR/*"
+  rm -rf "${TARGET_DIR:?}/*"
 fi
 
 mkdir -p "$TARGET_DIR"
@@ -27,8 +27,8 @@ git clone "$REPO_URL" "$TEMP_DIR"
 cd "$TEMP_DIR" || exit
 
 # Create .tool-versions file to specify the correct Java version
-echo "java corretto-17" > .tool-versions
-echo "gradle 7.5.1" >> .tool-versions
+echo "java corretto-17" >.tool-versions
+echo "gradle 7.5.1" >>.tool-versions
 
 # Ensure the correct Java version is used
 mise install
