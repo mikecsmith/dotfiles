@@ -3,7 +3,7 @@
 
 deno = 'latest'
 go = 'latest'
-gradle = '8.9'
+gradle = 'latest'
 java = "corretto-21"
 julia = 'latest'
 kind = 'latest'
@@ -12,9 +12,9 @@ kustomize = 'latest'
 helm = 'latest'
 lua = '5.1'
 node = 'lts'
-pnpm = '10'
-python = "3.12.6"
-quarkus = '3.14.1'
+pnpm = 'latest'
+python = "latest"
+quarkus = 'latest'
 scala = 'latest'
 terraform = 'latest'
 
