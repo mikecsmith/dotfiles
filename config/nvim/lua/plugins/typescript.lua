@@ -1,9 +1,3 @@
-local util = require("lspconfig.util")
-
-local get_root_dir = function(fname)
-  return util.root_pattern(".git")(fname) or util.root_pattern("package.json", "tsconfig.json")(fname)
-end
-
 return {
   {
     "mason-org/mason.nvim",
@@ -18,9 +12,6 @@ return {
     opts = {
       servers = {
         denols = {
-          root_dir = function(fname)
-            return util.root_pattern("deno.json", "deno.jsonc")(fname)
-          end,
           settings = {
             typescript = {
               inlayHints = {
@@ -44,11 +35,7 @@ return {
             },
           },
         },
-        eslint = {
-          root_dir = get_root_dir,
-        },
         vtsls = {
-          root_dir = get_root_dir,
           settings = {
             typescript = {
               compilerOptions = {
@@ -60,5 +47,44 @@ return {
         },
       },
     },
+  },
+  {
+    "mfussenegger/nvim-dap",
+    opts = function()
+      local dap = require("dap")
+
+      local function resolve_amaro_loader()
+        local root = vim.fn.getcwd()
+        local pattern = root .. "/node_modules/.pnpm/amaro@*/node_modules/amaro/dist/register-strip.mjs"
+        local matches = vim.fn.glob(pattern, true, true)
+        if #matches > 0 then
+          return matches[1]
+        end
+        return nil
+      end
+
+      local loader = resolve_amaro_loader()
+
+      local vitest_config = {
+        type = "node",
+        request = "launch",
+        name = "Debug Vitest (strip-types)",
+        runtimeExecutable = "node",
+        runtimeArgs = vim.list_extend({
+          "--experimental-strip-types",
+          "--conditions=typescript",
+        }, loader and { "--import", loader } or {}),
+        program = "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+        args = { "run", "${file}" },
+        cwd = "${workspaceFolder}",
+        console = "integratedTerminal",
+        internalConsoleOptions = "neverOpen",
+      }
+
+      for _, ft in ipairs({ "typescript", "javascript", "typescriptreact", "javascriptreact" }) do
+        dap.configurations[ft] = dap.configurations[ft] or {}
+        table.insert(dap.configurations[ft], vitest_config)
+      end
+    end,
   },
 }
