@@ -3,9 +3,6 @@ return {
     "saghen/blink.cmp",
     dependencies = { "fang2hou/blink-copilot" },
     opts = {
-      keymap = {
-        preset = "super-tab",
-      },
       sources = {
         per_filetype = {
           sql = { "snippets", "dadbod", "buffer" },
