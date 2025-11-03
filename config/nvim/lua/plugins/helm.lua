@@ -63,20 +63,20 @@ return {
       },
       setup = {
         helm_ls = function()
-          LazyVim.lsp.on_attach(function(client, _)
+          Snacks.util.lsp.on({ name = "helm-ls" }, function(_, client)
             client.server_capabilities.documentFormattingProvider = true
-          end, "helm-ls")
+          end)
         end,
         yamlls = function()
           -- Prevent yamlls from attaching to Helm-related filetypes
-          LazyVim.lsp.on_attach(function(client, buffer)
+          Snacks.util.lsp.on({ name = "yamlls" }, function(buffer)
             local ft = vim.bo[buffer].filetype
             if ft == "helm" or ft == "yaml.helm-values" then
               vim.schedule(function()
                 vim.cmd("LspStop ++force yamlls")
               end)
             end
-          end, "yamlls")
+          end)
         end,
       },
     },

@@ -10,4 +10,3 @@ vim.filetype.add({
     ["Tiltfile.*"] = "tiltfile",
   },
 })
-vim.g.ai_cmp = false
