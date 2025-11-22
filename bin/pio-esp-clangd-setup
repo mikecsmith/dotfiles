@@ -1,0 +1,79 @@
+#!/bin/bash
+#
+# pio-esp-clangd-setup
+# ----------------
+# Generates a .clangd configuration for PlatformIO/Xtensa projects.
+# Usage: ./pio-esp-clangd-setup [variant]
+
+VARIANT="${1:-esp32s3}"
+
+echo "🔧 Configuring .clangd for: $VARIANT"
+
+TOOLCHAIN_ROOT="$HOME/.platformio/packages/toolchain-xtensa-esp-elf"
+
+if [ ! -d "$TOOLCHAIN_ROOT" ]; then
+  echo "❌ Error: Toolchain not found at $TOOLCHAIN_ROOT"
+  echo "   Run 'pio run' first to install project dependencies."
+  exit 1
+fi
+
+GCC_LIB_BASE="$TOOLCHAIN_ROOT/lib/gcc/xtensa-esp-elf"
+GCC_VERSION=$(find "$GCC_LIB_BASE" -maxdepth 1 -mindepth 1 -type d -exec basename {} \; | sort -V | tail -n 1)
+
+if [ -z "$GCC_VERSION" ]; then
+  echo "❌ Error: Could not detect GCC version in $GCC_LIB_BASE"
+  exit 1
+fi
+
+echo "✅ Detected GCC Version: $GCC_VERSION"
+
+PATH_CXX="$TOOLCHAIN_ROOT/xtensa-esp-elf/include/c++/$GCC_VERSION"
+PATH_CXX_TARGET="$TOOLCHAIN_ROOT/xtensa-esp-elf/include/c++/$GCC_VERSION/xtensa-esp-elf"
+PATH_CXX_VARIANT="$PATH_CXX_TARGET/$VARIANT"
+PATH_CXX_BACKWARD="$TOOLCHAIN_ROOT/xtensa-esp-elf/include/c++/$GCC_VERSION/backward"
+PATH_GCC_INCLUDE="$TOOLCHAIN_ROOT/lib/gcc/xtensa-esp-elf/$GCC_VERSION/include"
+PATH_GCC_FIXED="$TOOLCHAIN_ROOT/lib/gcc/xtensa-esp-elf/$GCC_VERSION/include-fixed"
+PATH_SYS_INCLUDE="$TOOLCHAIN_ROOT/xtensa-esp-elf/include"
+
+if [ ! -d "$PATH_CXX_VARIANT" ]; then
+  echo "⚠️  Warning: Variant path not found: $PATH_CXX_VARIANT"
+  echo "   Available variants:"
+  find "$PATH_CXX_TARGET" -maxdepth 1 -mindepth 1 -type d -name "esp*" -exec basename {} \;
+fi
+
+cat >.clangd <<EOF
+CompileFlags:
+  Remove:
+    - -mdisable-hardware-atomics
+    - -mfix-esp32-psram-cache-issue
+    - -mfix-esp32-psram-cache-strategy=memw
+    - -fno-tree-switch-conversion
+    - -mlongcalls
+    - -fstrict-volatile-bitfields
+    - -xtensa-$VARIANT-elf
+
+  Add:
+    - --target=riscv32-unknown-unknown
+
+    - -isystem$PATH_CXX
+EOF
+
+if [ -d "$PATH_CXX_VARIANT" ]; then
+  echo "    - -isystem$PATH_CXX_VARIANT" >>.clangd
+fi
+
+cat >>.clangd <<EOF
+    - -isystem$PATH_CXX_TARGET
+    - -isystem$PATH_CXX_BACKWARD
+    - -isystem$PATH_GCC_FIXED
+    - -isystem$PATH_GCC_INCLUDE
+    - -isystem$PATH_SYS_INCLUDE
+
+    - -D__XTENSA__
+    - -D__$(echo "$VARIANT" | tr '[:lower:]' '[:upper:]')__
+    - -DESP_PLATFORM
+    - -Wno-unknown-attributes
+    - -D__float128=double
+EOF
+
+echo "🎉 Successfully generated .clangd"

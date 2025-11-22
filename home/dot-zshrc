@@ -80,6 +80,7 @@ export PATH=$HOME/.local/bin:$PATH
 export PATH=$PATH:$HOME/.cargo/bin
 export PATH=$PATH:$HOME/.luarocks/bin
 export PATH=$PATH:/opt/homebrew/bin
+export PATH=$PATH:$HOME/.platformio/penv/bin
 
 # ============================================================================
 # Environment Variables
