@@ -31,7 +31,6 @@ brew "libpq"
 brew "lynx"
 brew "mise"
 brew "mermaid-cli"
-brew "nvim", args: ["--HEAD"]
 brew "p7zip"
 brew "parallel"
 brew "pandoc"

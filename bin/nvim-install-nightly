@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+URL="https://github.com/neovim/neovim/releases/download/nightly/nvim-macos-arm64.tar.gz"
+TMP="$(mktemp -d)"
+TAR="$TMP/nvim.tar.gz"
+INSTALL_DIR="$HOME/.local/nvim"
+BIN_DIR="$HOME/.local/bin"
+NVIM_BIN="$BIN_DIR/nvim"
+
+cd "$TMP"
+curl -sL -o "$TAR" "$URL"
+xattr -c "$TAR" 2>/dev/null || true
+
+tar -xzf "$TAR"
+EXDIR="$(find "$TMP" -maxdepth 1 -type d -name 'nvim*' -print -quit)"
+[ -n "$EXDIR" ] || { echo "Extraction failed"; rm -rf "$TMP"; exit 1; }
+
+# Clean old install if it exists
+rm -rf "$INSTALL_DIR"
+mv "$EXDIR" "$INSTALL_DIR"
+
+# Ensure ~/.local/bin exists and symlink binary
+mkdir -p "$BIN_DIR"
+ln -sf "$INSTALL_DIR/bin/nvim" "$NVIM_BIN"
+chmod +x "$INSTALL_DIR/bin/nvim"
+
+# Clean up temp dir
+rm -rf "$TMP"
+
+echo "✅ Neovim nightly installed successfully to $INSTALL_DIR"
+echo "→ Symlinked to $NVIM_BIN"
