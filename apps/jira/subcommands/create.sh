@@ -4,6 +4,7 @@
 # @option --type[=Task|Epic|Bug|Story|Sub-task|Initiative] Specify the type of issue to create
 # @option --parent Specify the parent issue
 # @option --status[=Backlog|Refined|Refinement in progress|Refinement in review|Selected for Refinement|In Review|Ready for Development|Done|Wont do]
+# @option --from-file <file> Use an existing file to create an issue
 
 eval "$(argc --argc-eval "$0" "$@")"
 
@@ -18,32 +19,41 @@ source "$J_UTILS_DIR/jira/build_frontmatter.sh"
 # shellcheck source=../utils/jira/get_active_sprint.sh
 source "$J_UTILS_DIR/jira/get_active_sprint.sh"
 
-frontmatter_params=()
+# shellcheck disable=SC2154
+if [[ -n "$argc_from_file" ]]; then
+  if [[ ! -f "$argc_from_file" ]]; then
+    echo "Error: File not found: $argc_from_file" >&2
+    exit 1
+  fi
+  tmpfile="$argc_from_file"
+else
+  frontmatter_params=()
 
-# shellcheck disable=SC2154,SC2046,SC2086
-if [[ "$argc_type" == "Epic" ]]; then
-  frontmatter_params+=("name: ")
+  # shellcheck disable=SC2154,SC2046,SC2086
+  if [[ "$argc_type" == "Epic" ]]; then
+    frontmatter_params+=("name: ")
+  fi
+
+  frontmatter_params+=(
+    "summary: "
+    "type: $argc_type"
+    "status: $argc_status"
+  )
+
+  # shellcheck disable=SC2154,SC2046,SC2086
+  [[ "$argc_sprint" -eq 1 ]] && frontmatter_params+=("sprint: true")
+
+  if [[ -n "$argc_parent" ]]; then
+    frontmatter_params+=("parent: $argc_parent")
+  fi
+
+  tmpfile=$(mktemp /tmp/jira_create_"$(date +%Y%m%d_%H%M%S)".md)
+
+  build_frontmatter "${frontmatter_params[@]}" >"$tmpfile"
+  append_template "$argc_type" "$tmpfile"
+
+  nvim +2 "$tmpfile"
 fi
-
-frontmatter_params+=(
-  "summary: "
-  "type: $argc_type"
-  "status: $argc_status"
-)
-
-# shellcheck disable=SC2154,SC2046,SC2086
-[[ "$argc_sprint" -eq 1 ]] && frontmatter_params+=("sprint: true")
-
-if [[ -n "$argc_parent" ]]; then
-  frontmatter_params+=("parent: $argc_parent")
-fi
-
-tmpfile=$(mktemp /tmp/jira_create_"$(date +%Y%m%d_%H%M%S)".md)
-
-build_frontmatter "${frontmatter_params[@]}" >"$tmpfile"
-append_template "$argc_type" "$tmpfile"
-
-nvim +2 "$tmpfile"
 
 yaml=$(awk '/^---/{flag=!flag; next} flag' "$tmpfile")
 
@@ -106,4 +116,12 @@ if [[ "$jira_output" =~ \{.*\"key\":\"([^\"]+)\".*\} ]]; then
       echo "Warning: Could not transition issue to '$status'. The issue was created successfully."
     }
   fi
+else
+  echo "Error creating Jira issue." >&2
+  echo "Jira output:" >&2
+  echo "$jira_output" >&2
+  echo "Your work has been saved to: $tmpfile" >&2
+  echo "You can retry creating the issue with the following command:" >&2
+  echo "j create --from-file $tmpfile" >&2
+  exit 1
 fi
