@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+import sys
+import json
+import subprocess
+import os
+
+# --- DEBUGGING ---
+LOG_FILE = "/tmp/smart_open.log"
+
+
+def log(msg):
+    with open(LOG_FILE, "a") as f:
+        import datetime
+
+        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+        f.write(f"[{timestamp}] {msg}\n")
+
+
+def get_kitty_state():
+    try:
+        # Ask Kitty for the state of all windows
+        result = subprocess.check_output(["kitty", "@", "ls"], text=True)
+        return json.loads(result)
+    except Exception as e:
+        log(f"Failed to get kitty state: {e}")
+        return []
+
+
+def main():
+    if len(sys.argv) < 2:
+        return
+
+    file_info = sys.argv[1]
+
+    # 1. Parse file:line
+    line_num = None
+    file_path = file_info
+
+    if ":" in file_info:
+        parts = file_info.rsplit(":", 1)
+        if parts[1].isdigit():
+            file_path = parts[0]
+            line_num = parts[1]
+
+    # 2. Find the Target Neovim Window
+    state = get_kitty_state()
+    target_address = None
+    target_id = None  # <--- Store the ID here
+
+    for os_window in state:
+        for tab in os_window.get("tabs", []):
+            if tab.get("is_focused"):
+                for window in tab.get("windows", []):
+                    user_vars = window.get("user_vars", {})
+                    addr = user_vars.get("nvim_server")
+                    if addr:
+                        target_address = addr
+                        target_id = window["id"]  # <--- Capture ID
+                        break
+            if target_address:
+                break
+        if target_address:
+            break
+
+    if not target_address:
+        log("Could not find a window with 'nvim_server' in the active tab.")
+        return
+
+    # 3. Send to Neovim
+    cmd_str = f"<C-\\><C-n>:e {file_path}<CR>"
+    if line_num:
+        cmd_str += f":{line_num}<CR>"
+    cmd_str += "zz"
+
+    # Use expanduser to find your nightly build safely
+    nvim_binary = os.path.expanduser("~/.local/bin/nvim")
+
+    subprocess.Popen(
+        [nvim_binary, "--server", target_address, "--remote-send", cmd_str]
+    )
+
+    # 4. Focus the Window
+    # We use --match id:123 to target the specific window we found
+    subprocess.run(["kitty", "@", "focus-window", "--match", f"id:{target_id}"])
+
+
+if __name__ == "__main__":
+    main()

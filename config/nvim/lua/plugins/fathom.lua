@@ -1,7 +1,6 @@
 vim.api.nvim_set_hl(0, "VisualNonText", { fg = "#5D5F71", bg = "#24282d" })
 
 return {
-  { "folke/noice.nvim", enabled = false },
   {
     "folke/snacks.nvim",
     opts = {
