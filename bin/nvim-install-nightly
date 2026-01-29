@@ -8,25 +8,50 @@ INSTALL_DIR="$HOME/.local/nvim"
 BIN_DIR="$HOME/.local/bin"
 NVIM_BIN="$BIN_DIR/nvim"
 
+echo "⏳ Downloading Neovim nightly..."
 cd "$TMP"
 curl -sL -o "$TAR" "$URL"
-xattr -c "$TAR" 2>/dev/null || true
 
+# 1. Strip quarantine flags before extraction
+xattr -rc "$TAR" 2>/dev/null || true
+
+echo "📦 Extracting..."
 tar -xzf "$TAR"
 EXDIR="$(find "$TMP" -maxdepth 1 -type d -name 'nvim*' -print -quit)"
-[ -n "$EXDIR" ] || { echo "Extraction failed"; rm -rf "$TMP"; exit 1; }
+[ -n "$EXDIR" ] || {
+  echo "Extraction failed"
+  rm -rf "$TMP"
+  exit 1
+}
 
-# Clean old install if it exists
+# Clean old install
 rm -rf "$INSTALL_DIR"
 mv "$EXDIR" "$INSTALL_DIR"
 
-# Ensure ~/.local/bin exists and symlink binary
+# Ensure ~/.local/bin exists and symlink
 mkdir -p "$BIN_DIR"
 ln -sf "$INSTALL_DIR/bin/nvim" "$NVIM_BIN"
 chmod +x "$INSTALL_DIR/bin/nvim"
 
-# Clean up temp dir
+# --- NEW: SECURITY & SIGNING STEP ---
+echo "🔐 Ad-hoc signing Neovim and its internal libraries..."
+
+# 2. Sign the main binary
+codesign -s - -f --entitlements /dev/null "$INSTALL_DIR/bin/nvim"
+
+# 3. Sign bundled shared libraries (critical for loading parsers)
+if [ -d "$INSTALL_DIR/lib" ]; then
+  find "$INSTALL_DIR/lib" -name "*.dylib" -exec codesign -s - -f {} + 2>/dev/null
+fi
+
+# 4. Sign bundled tree-sitter parsers if they exist in the bundle
+if [ -d "$INSTALL_DIR/lib/nvim/parser" ]; then
+  find "$INSTALL_DIR/lib/nvim/parser" -name "*.so" -exec codesign -s - -f {} + 2>/dev/null
+fi
+# ------------------------------------
+
+# Clean up
 rm -rf "$TMP"
 
-echo "✅ Neovim nightly installed successfully to $INSTALL_DIR"
-echo "→ Symlinked to $NVIM_BIN"
+echo "✅ Neovim nightly installed and signed successfully!"
+echo "→ Binary: $NVIM_BIN"
