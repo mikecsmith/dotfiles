@@ -147,11 +147,6 @@ alt-shift-semicolon = 'mode service'
 if.app-id = 'net.kovidgoyal.kitty'
 run = 'move-node-to-workspace 1'
 
-
-[[on-window-detected]]
-if.app-id = 'company.thebrowser.Browser'
-run = 'move-node-to-workspace 2'
-
 # 'service' binding mode declaration.
 # See: https://nikitabobko.github.io/AeroSpace/guide#binding-modes
 [mode.service.binding]
