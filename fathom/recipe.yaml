@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://schema.blue-build.org/recipe-v1.json
+name: fathom-os
+description: A Linux OS built for use with my dotfiles
+base-image: ghcr.io/wayblueorg/niri-nvidia
+image-version: 43
+platforms:
+  - linux/amd64
+
+modules:
+  - type: rpm-ostree
+    install:
+      - zsh
+      - stow
+      - git
+      - fzf
+      - ripgrep
+      - fd-find
+      - bat
+      - jq
+      - podman-docker
+
+    remove:
+      - firefox
+
+  - type: fonts
+    fonts:
+      nerd-fonts:
+        - Meslo
+
+  - type: default-flatpaks
+    notify: false
+    system:
+      repo-url: https://dl.flathub.org/repo/flathub.flatpakrepo
+      install:
+        - com.kovidgoyal.kitty
+        - io.github.zen_browser.zen
+        - com.visualstudio.code
