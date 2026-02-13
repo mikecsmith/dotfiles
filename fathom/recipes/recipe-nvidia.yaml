@@ -25,10 +25,9 @@ modules:
         - Meslo
 
   - type: default-flatpaks
-    notify: false
-    system:
-      repo-url: https://dl.flathub.org/repo/flathub.flatpakrepo
-      install:
-        - com.kovidgoyal.kitty
-        - io.github.zen_browser.zen
-        - com.visualstudio.code
+    configurations:
+      - scope: system
+        install:
+          - com.kovidgoyal.kitty
+          - io.github.zen_browser.zen
+          - com.visualstudio.code
