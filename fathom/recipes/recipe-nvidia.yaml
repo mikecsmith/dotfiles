@@ -19,9 +19,6 @@ modules:
       - jq
       - podman-docker
 
-    remove:
-      - firefox
-
   - type: fonts
     fonts:
       nerd-fonts:
