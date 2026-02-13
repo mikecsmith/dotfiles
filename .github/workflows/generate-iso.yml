@@ -1,0 +1,30 @@
+name: Generate ISO
+on:
+  workflow_dispatch:
+
+jobs:
+  iso:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Build ISO from Latest Image
+        uses: jasonn3/build-container-installer@v1.2.4
+        with:
+          image_repo: ghcr.io/${{ github.repository_owner }}
+          image_name: fathom-os
+          image_tag: latest
+          variant: Silverblue
+          version: 43
+          iso_name: fathom-os.iso
+
+      - name: Upload ISO Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FathomOS-Installer
+          path: fathom-os.iso
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0

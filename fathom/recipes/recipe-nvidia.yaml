@@ -12,6 +12,7 @@ modules:
       - zsh
       - stow
       - git
+      - kitty
       - fzf
       - ripgrep
       - fd-find
@@ -28,6 +29,4 @@ modules:
     configurations:
       - scope: system
         install:
-          - com.kovidgoyal.kitty
-          - io.github.zen_browser.zen
           - com.visualstudio.code
