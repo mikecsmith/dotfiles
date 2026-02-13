@@ -26,7 +26,7 @@ jobs:
       fail-fast: false
       matrix:
         recipe:
-          - fathom/recipe.yaml
+          - recipe-nvidia.yaml
     steps:
       - name: Build Custom Image
         uses: blue-build/github-action@v1.10
@@ -36,3 +36,4 @@ jobs:
           registry_token: ${{ github.token }}
           pr_event_number: ${{ github.event.number }}
           maximize_build_space: true
+          working_directory: ./fathom/
