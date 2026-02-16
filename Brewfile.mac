@@ -27,6 +27,7 @@ brew "wget"
 brew "zip"
 
 # Casks
+cask "alt-tab"
 cask "bruno"
 cask "font-codicon"
 cask "iina"
