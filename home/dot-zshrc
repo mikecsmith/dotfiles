@@ -129,25 +129,55 @@ if (( $+commands[kind] )); then
     eval "$(kind completion zsh)"
 fi
 
+
 if (( $+commands[starship] )); then
     eval "$(starship init zsh)"
+    zmodload zsh/datetime
+    bindkey -v  
 
-    _starship_full_prompt() {
-        PROMPT=$(starship prompt)
-    }
-    add-zsh-hook precmd _starship_full_prompt
-
-    _starship_transient_prompt_accept_line() {
-        PROMPT=$(starship module character)
-        zle .reset-prompt
-        zle .accept-line
+    _starship_build_prompt() {
+        local current_keymap="${KEYMAP:-main}"
+        local job_count=$(jobs | wc -l | tr -d ' ')
+        PROMPT="$(starship prompt --terminal-width="$COLUMNS" --keymap="$current_keymap" --status=${_STARSHIP_LAST_STATUS:-0} --cmd-duration=${_STARSHIP_LAST_DURATION:-0} --jobs="$job_count")"
     }
 
-    zle -N accept-line _starship_transient_prompt_accept_line
+    _starship_timer_start() {
+        export _MY_CMD_START_TIME=${EPOCHREALTIME}
+    }
+    autoload -Uz add-zsh-hook
+    add-zsh-hook preexec _starship_timer_start
+
+    _starship_precmd() {
+        _STARSHIP_LAST_STATUS=$?
+        _STARSHIP_LAST_DURATION=0
+        if [[ -n $_MY_CMD_START_TIME ]]; then
+            local end_time=${EPOCHREALTIME}
+            _STARSHIP_LAST_DURATION=$(( (end_time - _MY_CMD_START_TIME) * 1000 ))
+            _STARSHIP_LAST_DURATION=${_STARSHIP_LAST_DURATION%.*}
+        fi
+        unset _MY_CMD_START_TIME
+
+        _starship_build_prompt
+    }
+    add-zsh-hook precmd _starship_precmd
+
+    _starship_zle-keymap-select() {
+        _starship_build_prompt
+        zle reset-prompt
+    }
+    zle -N zle-keymap-select _starship_zle-keymap-select
+
+    _starship_transient_collapse() {
+        if [[ "$CONTEXT" == "start" ]]; then
+            PROMPT="$(starship module character) "
+            RPROMPT=""
+            zle .reset-prompt
+        fi
+    }
+    zle -N zle-line-finish _starship_transient_collapse
 fi
 
 if (( $+commands[zoxide] )); then
-  # The --cmd flag tells zoxide to alias 'cd' to its own wrapper
   eval "$(zoxide init zsh --cmd cd)"
 fi
 
