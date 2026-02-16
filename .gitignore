@@ -1,6 +1,3 @@
 .zsh_sessions
 .zsh_history
-config/aerc/accounts.conf
-config/aerc/keymap.map
-config/git/config
-config/nvim-old
+config/common/git/config
