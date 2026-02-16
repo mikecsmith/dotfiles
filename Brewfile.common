@@ -1,3 +1,4 @@
+# vi: ft=asm
 brew "bat"
 brew "bkt"
 brew "btop"
