@@ -1,57 +1,96 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-URL="https://github.com/neovim/neovim/releases/download/nightly/nvim-macos-arm64.tar.gz"
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+
+echo "🔍 Detected OS: $OS, Arch: $ARCH"
+
+if [[ "$OS" == "Darwin" ]]; then
+  if [[ "$ARCH" == "arm64" ]]; then
+    FILENAME="nvim-macos-arm64.tar.gz"
+  else
+    FILENAME="nvim-macos-x86_64.tar.gz"
+  fi
+elif [[ "$OS" == "Linux" ]]; then
+  if [[ "$ARCH" == "aarch64" ]]; then
+    FILENAME="nvim-linux-arm64.tar.gz"
+  else
+    FILENAME="nvim-linux-x86_64.tar.gz"
+  fi
+else
+  echo "❌ Unsupported OS: $OS"
+  exit 1
+fi
+
+URL="https://github.com/neovim/neovim/releases/download/nightly/$FILENAME"
 TMP="$(mktemp -d)"
-TAR="$TMP/nvim.tar.gz"
+TAR="$TMP/$FILENAME"
 INSTALL_DIR="$HOME/.local/nvim"
 BIN_DIR="$HOME/.local/bin"
 NVIM_BIN="$BIN_DIR/nvim"
 
-echo "⏳ Downloading Neovim nightly..."
-cd "$TMP"
-curl -sL -o "$TAR" "$URL"
+echo "⏳ Downloading Neovim nightly ($FILENAME)..."
 
-# 1. Strip quarantine flags before extraction
-xattr -rc "$TAR" 2>/dev/null || true
+cd "$TMP"
+
+if ! curl -fL -o "$TAR" "$URL"; then
+  echo "❌ Download failed! The URL might be wrong or the server is down."
+  echo "   Attempted URL: $URL"
+  rm -rf "$TMP"
+  exit 1
+fi
+
+if [[ "$OS" == "Darwin" ]]; then
+  echo "🍎 macOS detected: Clearing quarantine attributes..."
+  xattr -rc "$TAR" 2>/dev/null || true
+fi
 
 echo "📦 Extracting..."
 tar -xzf "$TAR"
-EXDIR="$(find "$TMP" -maxdepth 1 -type d -name 'nvim*' -print -quit)"
-[ -n "$EXDIR" ] || {
-  echo "Extraction failed"
+
+EXDIR="$(find "$TMP" -maxdepth 1 -type d -name 'nvim-*' -print -quit)"
+
+if [ -z "$EXDIR" ]; then
+  echo "❌ Extraction failed: Could not find extracted folder."
   rm -rf "$TMP"
   exit 1
-}
+fi
 
-# Clean old install
+echo "🔄 Installing to $INSTALL_DIR..."
 rm -rf "$INSTALL_DIR"
 mv "$EXDIR" "$INSTALL_DIR"
 
-# Ensure ~/.local/bin exists and symlink
 mkdir -p "$BIN_DIR"
-ln -sf "$INSTALL_DIR/bin/nvim" "$NVIM_BIN"
+if [ -L "$NVIM_BIN" ] || [ -e "$NVIM_BIN" ]; then
+  rm -f "$NVIM_BIN"
+fi
+ln -s "$INSTALL_DIR/bin/nvim" "$NVIM_BIN"
 chmod +x "$INSTALL_DIR/bin/nvim"
 
-# --- NEW: SECURITY & SIGNING STEP ---
-echo "🔐 Ad-hoc signing Neovim and its internal libraries..."
+if [[ "$OS" == "Darwin" ]]; then
+  echo "🔐 macOS detected: Ad-hoc signing binaries..."
 
-# 2. Sign the main binary
-codesign -s - -f --entitlements /dev/null "$INSTALL_DIR/bin/nvim"
+  codesign -s - -f --entitlements /dev/null "$INSTALL_DIR/bin/nvim"
 
-# 3. Sign bundled shared libraries (critical for loading parsers)
-if [ -d "$INSTALL_DIR/lib" ]; then
-  find "$INSTALL_DIR/lib" -name "*.dylib" -exec codesign -s - -f {} + 2>/dev/null
+  if [ -d "$INSTALL_DIR/lib" ]; then
+    find "$INSTALL_DIR/lib" -name "*.dylib" -exec codesign -s - -f {} + 2>/dev/null
+  fi
+
+  if [ -d "$INSTALL_DIR/lib/nvim/parser" ]; then
+    find "$INSTALL_DIR/lib/nvim/parser" -name "*.so" -exec codesign -s - -f {} + 2>/dev/null
+  fi
 fi
 
-# 4. Sign bundled tree-sitter parsers if they exist in the bundle
-if [ -d "$INSTALL_DIR/lib/nvim/parser" ]; then
-  find "$INSTALL_DIR/lib/nvim/parser" -name "*.so" -exec codesign -s - -f {} + 2>/dev/null
-fi
-# ------------------------------------
-
-# Clean up
 rm -rf "$TMP"
 
-echo "✅ Neovim nightly installed and signed successfully!"
-echo "→ Binary: $NVIM_BIN"
+echo "✅ Neovim nightly installed successfully!"
+echo "→ Location: $INSTALL_DIR"
+echo "→ Binary:   $NVIM_BIN"
+
+if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
+  echo ""
+  echo "⚠️  WARNING: $BIN_DIR is NOT in your PATH."
+  echo "   Add this to your shell config (~/.bashrc or ~/.zshrc):"
+  echo "   export PATH=\"$BIN_DIR:\$PATH\""
+fi

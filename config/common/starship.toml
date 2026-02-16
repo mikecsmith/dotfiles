@@ -1,0 +1,65 @@
+add_newline = false
+# Starship config matching your P10k Lean parameters
+format = """
+[╭─](fg:244)$os$username$hostname$directory$git_branch$git_status$fill$status$cmd_duration$time
+[╰─](fg:244)$character"""
+
+# This module fills the gap between left and right with dots (p10k_gap_char)
+[fill]
+symbol = "·"
+style = "fg:244"
+
+[os]
+disabled = false
+format = "[$symbol]($style)"
+style = "fg:244"
+
+[username]
+show_always = true
+style_user = "fg:180" # Matching typeset -g POWERLEVEL9K_CONTEXT_FOREGROUND=180
+style_root = "bold fg:178"
+format = "[$user]($style)"
+
+[hostname]
+ssh_only = false
+style = "fg:180"
+format = "[@$hostname]($style) "
+
+[directory]
+style = "fg:31" # Matching typeset -g POWERLEVEL9K_DIR_FOREGROUND=31
+read_only = " 🔒"
+truncation_length = 3
+format = "[$path]($style)[$read_only]($style) "
+
+[git_branch]
+symbol = " "
+style = "fg:76" # Matching typeset -g POWERLEVEL9K_VCS_CLEAN_FOREGROUND=76
+format = "on [$symbol$branch]($style) "
+
+[git_status]
+style = "fg:76" 
+format = "([\\[$all_status$ahead_behind\\]]($style) )"
+
+[status]
+disabled = false
+symbol = "✘"
+success_symbol = "✔"
+format = "[$symbol]($style) "
+style = "fg:160" # Matching typeset -g POWERLEVEL9K_STATUS_ERROR_FOREGROUND=160
+success_style = "fg:70" # Matching typeset -g POWERLEVEL9K_STATUS_OK_FOREGROUND=70
+
+[cmd_duration]
+min_time = 3000
+style = "fg:101" # Matching typeset -g POWERLEVEL9K_COMMAND_EXECUTION_TIME_FOREGROUND=101
+format = "took [$duration]($style) "
+
+[time]
+disabled = false
+time_format = "%I:%M:%S %p" 
+style = "fg:66" # Matching typeset -g POWERLEVEL9K_TIME_FOREGROUND=66
+format = "at [$time]($style)"
+
+[character]
+success_symbol = "[❯](bold fg:76)"
+error_symbol = "[❯](bold fg:196)"
+vicmd_symbol = "[❮](bold fg:76)"
