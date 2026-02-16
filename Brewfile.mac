@@ -1,9 +1,8 @@
-# Brewfile
+eval(File.read("Brewfile.common"))
 
 # Formulae
 brew "awscli"
 brew "bash"
-brew "bruno"
 brew "colima"
 brew "difftastic"
 brew "docker"
@@ -27,12 +26,13 @@ brew "wget"
 brew "zip"
 
 # Casks
-cask "nikitabobko/tap/aerospace"
-cask "zen"
+cask "bruno"
 cask "font-codicon"
 cask "iina"
+cask "karabiner-elements"
 cask "kitty"
 cask "visual-studio-code"
+cask "zen"
 
 # Nerd Fonts
 cask "font-meslo-lg-nerd-font"
