@@ -1,62 +1,100 @@
 add_newline = false
-# Starship config matching your P10k Lean parameters
+
 format = """
-[╭─](fg:244)$os$username$hostname$directory$git_branch$git_status$fill$status$cmd_duration$time
+[╭─](fg:244)$os$username$hostname$directory$git_branch$git_status$fill$cmd_duration$time
 [╰─](fg:244)$character"""
 
-# This module fills the gap between left and right with dots (p10k_gap_char)
+# Fill with dots
 [fill]
 symbol = "·"
 style = "fg:244"
 
+# -----------------------------------------------------------------------------
+# OS SYMBOLS (Mac & Linux)
+# -----------------------------------------------------------------------------
 [os]
 disabled = false
-format = "[$symbol]($style)"
-style = "fg:244"
+style = "fg:255"
+format = "[$symbol ]($style)"
 
-[username]
-show_always = true
-style_user = "fg:180" # Matching typeset -g POWERLEVEL9K_CONTEXT_FOREGROUND=180
-style_root = "bold fg:178"
-format = "[$user]($style)"
+[os.symbols]
+Macos = ""
+Ubuntu = ""
+Debian = ""
+Fedora = ""
+Arch = ""
+CentOS = ""
+Alpine = ""
+Linux = ""   # Generic fallback for other distros
+Windows = ""
 
-[hostname]
-ssh_only = false
-style = "fg:180"
-format = "[@$hostname]($style) "
+# -----------------------------------------------------------------------------
+# DIRECTORY & GIT
+# -----------------------------------------------------------------------------
 
 [directory]
-style = "fg:31" # Matching typeset -g POWERLEVEL9K_DIR_FOREGROUND=31
+style = "bold fg:31"                              # Added 'bold' to match p10k style
 read_only = " 🔒"
 truncation_length = 3
-format = "[$path]($style)[$read_only]($style) "
+format = "[ $path]($style)[$read_only]($style) "
 
 [git_branch]
-symbol = " "
-style = "fg:76" # Matching typeset -g POWERLEVEL9K_VCS_CLEAN_FOREGROUND=76
-format = "on [$symbol$branch]($style) "
+symbol = " "
+style = "fg:76"
+format = "[$symbol$branch]($style) "
 
+# -----------------------------------------------------------------------------
+# GIT STATUS PALETTE
+# -----------------------------------------------------------------------------
+# SYMBOL   MEANING                 COLOR           CODE
+# +        Staged (Ready)          Green           76
+# !        Modified (Changed)      Gold            178
+# ?        Untracked (New)         Blue            39
+# »        Renamed (Moved)         Purple          135
+# ✘        Deleted (Removed)       Red             160
+# *        Stashed (Saved)         Cyan            43
+# -----------------------------------------------------------------------------
+#
 [git_status]
-style = "fg:76" 
-format = "([\\[$all_status$ahead_behind\\]]($style) )"
+style = "fg:76"
+format = '($all_status$ahead_behind )'
+conflicted = "[~${count}](fg:196) "
+ahead = "[⇡${count}](fg:76)"
+behind = "[⇣${count}](fg:76)"
+diverged = "⇡${ahead_count}⇣${behind_count}"
+stashed = "[*${count}](fg:43) "
+untracked = "[?${count}](fg:39) "
+staged = "[+${count}](fg:76) "
+modified = "[!${count}](fg:178) "
+renamed = "[»${count}](fg:134) "
+deleted = "[✘${count}](fg:196) "
 
-[status]
-disabled = false
-symbol = "✘"
-success_symbol = "✔"
-format = "[$symbol]($style) "
-style = "fg:160" # Matching typeset -g POWERLEVEL9K_STATUS_ERROR_FOREGROUND=160
-success_style = "fg:70" # Matching typeset -g POWERLEVEL9K_STATUS_OK_FOREGROUND=70
+up_to_date = ""
+
+# -----------------------------------------------------------------------------
+# RIGHT SIDE INFO
+# -----------------------------------------------------------------------------
+
+[username]
+show_always = false
+style_user = "fg:180"
+style_root = "bold fg:178"
+format = "[$user]($style)@"
+
+[hostname]
+ssh_only = true
+style = "fg:180"
+format = "[$hostname]($style) "
 
 [cmd_duration]
 min_time = 3000
-style = "fg:101" # Matching typeset -g POWERLEVEL9K_COMMAND_EXECUTION_TIME_FOREGROUND=101
+style = "fg:101"
 format = "took [$duration]($style) "
 
 [time]
 disabled = false
-time_format = "%I:%M:%S %p" 
-style = "fg:66" # Matching typeset -g POWERLEVEL9K_TIME_FOREGROUND=66
+time_format = "%I:%M:%S %p"
+style = "fg:66"
 format = "at [$time]($style)"
 
 [character]

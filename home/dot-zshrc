@@ -128,6 +128,7 @@ fi
 if (( $+commands[kind] )); then
     eval "$(kind completion zsh)"
 fi
+
 if (( $+commands[starship] )); then
     eval "$(starship init zsh)"
 
@@ -137,7 +138,6 @@ if (( $+commands[starship] )); then
     add-zsh-hook precmd _starship_full_prompt
 
     _starship_transient_prompt_accept_line() {
-        # This collapses the prompt and ensures NO newline is left in history
         PROMPT=$(starship module character)
         zle .reset-prompt
         zle .accept-line
