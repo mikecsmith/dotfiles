@@ -121,10 +121,6 @@ alias rg="rg --color=always"
 # External Tool Initialization
 # ============================================================================
 
-if (( $+commands[mise] )); then
-    eval "$(mise activate zsh)"
-    export PATH="$HOME/.local/share/mise/shims:$PATH"
-fi
 if (( $+commands[kind] )); then
     eval "$(kind completion zsh)"
 fi
