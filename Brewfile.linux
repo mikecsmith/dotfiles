@@ -1,2 +1,0 @@
-# vi: ft=asm
-eval(File.read("Brewfile.common"))
