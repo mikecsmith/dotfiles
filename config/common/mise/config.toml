@@ -17,6 +17,7 @@ python = "latest"
 quarkus = 'latest'
 scala = 'latest'
 terraform = 'latest'
+"npm:spectral-language-server" = "latest"
 
 [settings]
 
@@ -24,3 +25,4 @@ legacy_version_file = true
 
 always_keep_download = false # deletes downloads after install
 always_keep_install = false  # deletes an install on a failure
+npm.package_manager = "pnpm"
