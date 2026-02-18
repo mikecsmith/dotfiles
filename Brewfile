@@ -1,3 +1,6 @@
+require 'socket'
+hostname = Socket.gethostname
+
 brew "bat"
 brew "bkt"
 brew "btop"
@@ -10,7 +13,6 @@ brew "git-absorb"
 brew "jq"
 brew "lazygit"
 brew "parallel"
-brew "spectral"
 brew "starship"
 brew "stow"
 brew "ripgrep"
@@ -27,6 +29,7 @@ end
 if OS.mac?
   # Formulae
   brew "awscli"
+  brew "argocd"
   brew "bash"
   brew "colima"
   brew "difftastic"
@@ -51,15 +54,25 @@ if OS.mac?
   brew "zip"
 
   # Casks
+  cask "1password-cli"
   cask "alt-tab"
   cask "bruno"
   cask "font-codicon"
   cask "iina"
-  cask "karabiner-elements"
   cask "kitty"
+  cask "quarto"
+  cask "raycast"
   cask "visual-studio-code"
-  cask "zen"
 
   # Nerd Fonts
   cask "font-meslo-lg-nerd-font"
+
+  # Personal
+  if hostname.start_with?("orcus")
+    brew "hivemq/mqtt-cli/mqtt-cli"
+    brew "siderolabs/tap/omnictl"
+    brew "siderolabs/tap/talosctl"
+
+    cask "arc"
+  end
 end
