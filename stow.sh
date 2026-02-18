@@ -3,46 +3,62 @@
 DOTFILES_DIR="$HOME/.dotfiles"
 cd "$DOTFILES_DIR" || exit
 
+MODE="-R"
+ACTION_TEXT="Stowing"
+DRY_RUN=""
+
+while getopts "unh" opt; do
+  case $opt in
+  u)
+    MODE="-D"
+    ACTION_TEXT="Unlinking"
+    ;;
+  n)
+    DRY_RUN="--simulate"
+    echo "--- DRY RUN MODE ENABLED ---"
+    ;;
+  h)
+    echo "Usage: ./script.sh [-u] [-n]"
+    exit 0
+    ;;
+  *) exit 1 ;;
+  esac
+done
+
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
-export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
-export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 
-mkdir -p "$XDG_CONFIG_HOME"
-mkdir -p "$XDG_DATA_HOME"
-mkdir -p "$HOME/.local/bin"
+if [[ "$MODE" == "-R" ]]; then
+  mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$HOME/.local/bin"
+fi
 
-# 1. Common Config
-echo "Stowing shared configurations..."
-stow -v -R -d config/common -t "$XDG_CONFIG_HOME" .
+echo "$ACTION_TEXT shared configurations..."
+stow $DRY_RUN -v "$MODE" -d config/common -t "$XDG_CONFIG_HOME" .
 
-# 2. Platform-Specific Config
 if [[ "$(uname -s)" == "Darwin" ]]; then
-    echo "Stowing macOS configurations..."
-    stow -v -R -d config/macos -t "$XDG_CONFIG_HOME" .
+  echo "$ACTION_TEXT macOS configurations..."
+  stow $DRY_RUN -v "$MODE" -d config/macos -t "$XDG_CONFIG_HOME" .
 elif [[ "$(uname -s)" == "Linux" ]]; then
-    echo "Stowing Linux configurations..."
-    stow -v -R -d config/linux -t "$XDG_CONFIG_HOME" .
+  echo "$ACTION_TEXT Linux configurations..."
+  stow $DRY_RUN -v "$MODE" -d config/linux -t "$XDG_CONFIG_HOME" .
 fi
 
-# 3. Universal Folders (using --dotfiles for the dot- prefix conversion)
-echo "Stowing home..."
-stow --dotfiles -v -R -t "$HOME" home
+echo "$ACTION_TEXT home..."
+stow $DRY_RUN --dotfiles -v "$MODE" -t "$HOME" home
 
-echo "Stowing bin..."
-# If Stow still complains about 'j', it's because it's still there. 
-# Added --adopt as a safety net, but usually 'rm' is better.
-stow -v -R -t "$HOME/.local/bin" bin
+echo "$ACTION_TEXT bin..."
+stow $DRY_RUN -v "$MODE" -t "$HOME/.local/bin" bin
 
-# Only run this if 'j' ISN'T already in your .dotfiles/bin folder
-if [[ ! -f "bin/j" ]]; then
-    ln -sf "$DOTFILES_DIR/apps/jira/j" "$HOME/.local/bin/j"
+J_LINK="$HOME/.local/bin/j"
+if [[ "$MODE" == "-D" ]]; then
+  [[ -L "$J_LINK" ]] && [[ -z "$DRY_RUN" ]] && rm "$J_LINK"
+elif [[ ! -f "bin/j" ]]; then
+  [[ -z "$DRY_RUN" ]] && ln -sf "$DOTFILES_DIR/apps/jira/j" "$J_LINK"
 fi
 
-# 4. Data (Check if directory exists first to avoid the data package error)
 if [[ -d "data" ]]; then
-    echo "Stowing data..."
-    stow -v -R -t "$XDG_DATA_HOME" data
+  echo "$ACTION_TEXT data..."
+  stow $DRY_RUN -v "$MODE" -t "$XDG_DATA_HOME" data
 fi
 
 echo "Done! Dotfiles synchronized."
