@@ -130,6 +130,10 @@ if has nvim; then
   alias rg="rg --color=always"
 fi
 
+if has kubectl; then
+  eval "$(kubectl completion zsh)"
+fi
+
 if has starship; then
   eval "$(starship init zsh)"
   zmodload zsh/datetime
@@ -254,4 +258,9 @@ if has zoxide; then
   bindkey '^[c' zoxide_jump_widget
   bindkey -M viins '^[c' zoxide_jump_widget
   bindkey -M vicmd '^[c' zoxide_jump_widget
+fi
+
+if [[ -d "${XDG_DATA_HOME:-$HOME/.local/share}/google-cloud-sdk" ]]; then
+  source "${XDG_DATA_HOME:-$HOME/.local/share}/google-cloud-sdk/path.zsh.inc"
+  source "${XDG_DATA_HOME:-$HOME/.local/share}/google-cloud-sdk/completion.zsh.inc"
 fi
