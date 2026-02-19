@@ -27,6 +27,8 @@ if OS.linux?
 end
 
 if OS.mac?
+  tap "tilt-dev/tap"
+
   # Formulae
   brew "awscli"
   brew "argocd"

@@ -16,11 +16,11 @@ export ZSH_CACHE_DIR="$XDG_CACHE_HOME/zsh"
 
 # Moved to .zshenv as its evaluated by tools which spawn child shells and provides them access to brew/mise bins
 if [[ -x "/opt/homebrew/bin/brew" ]]; then
-    eval "$(/opt/homebrew/bin/brew shellenv)"
+  eval "$(/opt/homebrew/bin/brew shellenv)"
 elif [[ -x "/home/linuxbrew/.linuxbrew/bin/brew" ]]; then
-    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 fi
 
 if command -v mise >/dev/null 2>&1; then
-    eval "$(mise activate zsh --quiet)"
+  eval "$(mise activate zsh --shims)"
 fi

@@ -1,8 +1,15 @@
 # ============================================================================
+# Utilities
+# ============================================================================
+
+has() {
+  ((${+commands[$1]}))
+}
+
+# ============================================================================
 # Platform Detection & Homebrew Setup
 # ============================================================================
 
-# Detect Operating System
 case "$(uname -s)" in
   Darwin)
     export IS_MAC=1
@@ -83,7 +90,7 @@ export PATH="$PATH:$HOME/.platformio/penv/bin"
 # Environment Variables
 # ============================================================================
 
-if (($ + commands[vivid])); then
+if has vivid; then
   export LS_COLORS="$(vivid generate tokyonight-moon)"
 fi
 
@@ -105,25 +112,25 @@ bindkey "^W" backward-kill-word
 # External Tool Initialization
 # ============================================================================
 
-if (($ + commands[eza])); then
+if has eza; then
   alias ls='eza --group-directories-first'
   alias tree='eza --tree'
 fi
 
-if (($ + commands[bat])); then
+if has bat; then
   alias cat='bat --style=plain --paging=never'
   export MANPAGER="sh -c 'col -bx | bat -l man -p'"
 fi
 
-if (($ + commands[kind])); then
+if has kind; then
   eval "$(kind completion zsh)"
 fi
 
-if (($ + commands[nvim])); then
+if has nvim; then
   alias rg="rg --color=always"
 fi
 
-if (($ + commands[starship])); then
+if has starship; then
   eval "$(starship init zsh)"
   zmodload zsh/datetime
 
@@ -169,7 +176,7 @@ if (($ + commands[starship])); then
   zle -N zle-line-finish _starship_transient_collapse
 fi
 
-if (($ + commands[nvim])); then
+if has nvim; then
   alias rg="rg --color=always"
 
   vi() {
@@ -202,7 +209,7 @@ if [[ -n "$BREW_PREFIX" ]]; then
 fi
 
 # Keep these below zsh-syntax-highlighting
-if (($ + commands[fzf])); then
+if has fzf; then
   source <(fzf --zsh)
   export FZF_CTRL_T_OPTS="
     --preview 'if [ -d {} ]; then eza --tree --level=1 --color=always --group-directories-first {}; else bat --color=always --style=numbers --line-range=:500 {}; fi'
@@ -228,7 +235,7 @@ if (($ + commands[fzf])); then
   bindkey -M vicmd '^[t' fzf-file-widget
 fi
 
-if (($ + commands[zoxide])); then
+if has zoxide; then
   eval "$(zoxide init zsh --cmd cd)"
 
   zoxide_jump_widget() {
