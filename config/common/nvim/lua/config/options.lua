@@ -10,8 +10,3 @@ vim.filetype.add({
     ["Tiltfile.*"] = "tiltfile",
   },
 })
-
-local mise_shims = vim.fn.expand("~/.local/share/mise/shims")
-if vim.fn.isdirectory(mise_shims) == 1 then
-  vim.env.PATH = mise_shims .. ":" .. vim.env.PATH
-end
