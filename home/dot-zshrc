@@ -4,41 +4,45 @@
 
 # Detect Operating System
 case "$(uname -s)" in
-    Darwin)
-        export IS_MAC=1
-        # Apple Silicon default path
-        [[ -f /opt/homebrew/bin/brew ]] && eval "$(/opt/homebrew/bin/brew shellenv)"
-        ;;
-    Linux)
-        export IS_LINUX=1
-        # Linuxbrew default path
-        [[ -f /home/linuxbrew/.linuxbrew/bin/brew ]] && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-        ;;
+  Darwin)
+    export IS_MAC=1
+    # Apple Silicon default path
+    [[ -f /opt/homebrew/bin/brew ]] && eval "$(/opt/homebrew/bin/brew shellenv)"
+    ;;
+  Linux)
+    export IS_LINUX=1
+    # Linuxbrew default path
+    [[ -f /home/linuxbrew/.linuxbrew/bin/brew ]] && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+    ;;
 esac
 
 # Cache brew prefix to avoid repeated slow subshell calls
 if type brew &>/dev/null; then
-    BREW_PREFIX=$(brew --prefix)
+  BREW_PREFIX=$(brew --prefix)
 fi
 
 # ============================================================================
 # ZSH Configuration
 # ============================================================================
 
-setopt NO_auto_cd             # Disable auto cd
-setopt NO_BEEP                # Disable audible bell
-setopt CHECK_JOBS             # Warn if there are background jobs when exiting
+setopt NO_auto_cd # Disable auto cd
+setopt NO_BEEP    # Disable audible bell
+setopt CHECK_JOBS # Warn if there are background jobs when exiting
 
 # ============================================================================
 # ZSH Completion System Setup
 # ============================================================================
 
 if [[ -n "$BREW_PREFIX" ]]; then
-    FPATH="$BREW_PREFIX/share/zsh/site-functions:$FPATH"
+  FPATH="$BREW_PREFIX/share/zsh/site-functions:$FPATH"
 
-    mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
-    autoload -Uz compinit
-    compinit -d "${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompdump"
+  mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
+  autoload -Uz compinit
+  compinit -d "${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompdump"
+  zstyle ':completion:*' menu select
+  zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+  local color_style='(s.:.)'
+  zstyle ':completion:*' list-colors "${color_style}${LS_COLORS}"
 fi
 
 # ============================================================================
@@ -59,20 +63,12 @@ setopt SHARE_HISTORY
 setopt EXTENDED_HISTORY
 
 # ============================================================================
-# Keybindings
-# ============================================================================
-
-bindkey '^P' history-search-backward
-bindkey '^N' history-search-forward
-bindkey "^W" backward-kill-word
-
-# ============================================================================
 # PATH Configuration
 # ============================================================================
 
 # Platform-specific PATH additions
 if [[ -n "$IS_MAC" && -n "$BREW_PREFIX" ]]; then
-    export PATH="$BREW_PREFIX/opt/libpq/bin:$PATH"
+  export PATH="$BREW_PREFIX/opt/libpq/bin:$PATH"
 fi
 
 # Universal PATH additions
@@ -87,107 +83,168 @@ export PATH="$PATH:$HOME/.platformio/penv/bin"
 # Environment Variables
 # ============================================================================
 
-if (( $+commands[vivid] )); then
-    export LS_COLORS="$(vivid generate tokyonight-moon)"
+if (($ + commands[vivid])); then
+  export LS_COLORS="$(vivid generate tokyonight-moon)"
 fi
 
 export CLICOLOR=1
-export EDITOR="nvim"          
-export VISUAL="nvim"         
+export EDITOR="nvim"
+export VISUAL="nvim"
 
 if [[ -f ~/.zsh_secrets ]]; then
-    source ~/.zsh_secrets
+  source ~/.zsh_secrets
 fi
 
 # ============================================================================
-# Useful Aliases
+# ZSH Keybindings
 # ============================================================================
 
-if (( $+commands[eza] )); then
-    alias ls='eza --group-directories-first'
-    alias tree='eza --tree'
-fi
-
-if (( $+commands[bat] )); then
-    alias cat='bat --style=plain --paging=never' 
-    export MANPAGER="sh -c 'col -bx | bat -l man -p'"
-fi
-
-alias vi="nvim"
-alias vim="nvim"
-alias rg="rg --color=always"
+bindkey "^W" backward-kill-word
 
 # ============================================================================
 # External Tool Initialization
 # ============================================================================
 
-if (( $+commands[kind] )); then
-    eval "$(kind completion zsh)"
+if (($ + commands[eza])); then
+  alias ls='eza --group-directories-first'
+  alias tree='eza --tree'
 fi
 
-
-if (( $+commands[starship] )); then
-    eval "$(starship init zsh)"
-    zmodload zsh/datetime
-    bindkey -v  
-
-    _starship_build_prompt() {
-        local current_keymap="${KEYMAP:-main}"
-        local job_count=$(jobs | wc -l | tr -d ' ')
-        PROMPT="$(starship prompt --terminal-width="$COLUMNS" --keymap="$current_keymap" --status=${_STARSHIP_LAST_STATUS:-0} --cmd-duration=${_STARSHIP_LAST_DURATION:-0} --jobs="$job_count")"
-    }
-
-    _starship_timer_start() {
-        export _MY_CMD_START_TIME=${EPOCHREALTIME}
-    }
-    autoload -Uz add-zsh-hook
-    add-zsh-hook preexec _starship_timer_start
-
-    _starship_precmd() {
-        _STARSHIP_LAST_STATUS=$?
-        _STARSHIP_LAST_DURATION=0
-        if [[ -n $_MY_CMD_START_TIME ]]; then
-            local end_time=${EPOCHREALTIME}
-            _STARSHIP_LAST_DURATION=$(( (end_time - _MY_CMD_START_TIME) * 1000 ))
-            _STARSHIP_LAST_DURATION=${_STARSHIP_LAST_DURATION%.*}
-        fi
-        unset _MY_CMD_START_TIME
-
-        _starship_build_prompt
-    }
-    add-zsh-hook precmd _starship_precmd
-
-    _starship_zle-keymap-select() {
-        _starship_build_prompt
-        zle reset-prompt
-    }
-    zle -N zle-keymap-select _starship_zle-keymap-select
-
-    _starship_transient_collapse() {
-        if [[ "$CONTEXT" == "start" ]]; then
-            PROMPT="$(starship module character) "
-            RPROMPT=""
-            zle .reset-prompt
-        fi
-    }
-    zle -N zle-line-finish _starship_transient_collapse
+if (($ + commands[bat])); then
+  alias cat='bat --style=plain --paging=never'
+  export MANPAGER="sh -c 'col -bx | bat -l man -p'"
 fi
 
-if (( $+commands[zoxide] )); then
-  eval "$(zoxide init zsh --cmd cd)"
+if (($ + commands[kind])); then
+  eval "$(kind completion zsh)"
+fi
+
+if (($ + commands[nvim])); then
+  alias rg="rg --color=always"
+fi
+
+if (($ + commands[starship])); then
+  eval "$(starship init zsh)"
+  zmodload zsh/datetime
+
+  _starship_build_prompt() {
+    local current_keymap="${KEYMAP:-main}"
+    local job_count=$(jobs | wc -l | tr -d ' ')
+    PROMPT="$(starship prompt --terminal-width="$COLUMNS" --keymap="$current_keymap" --status=${_STARSHIP_LAST_STATUS:-0} --cmd-duration=${_STARSHIP_LAST_DURATION:-0} --jobs="$job_count")"
+  }
+
+  _starship_timer_start() {
+    export _MY_CMD_START_TIME=${EPOCHREALTIME}
+  }
+  autoload -Uz add-zsh-hook
+  add-zsh-hook preexec _starship_timer_start
+
+  _starship_precmd() {
+    _STARSHIP_LAST_STATUS=$?
+    _STARSHIP_LAST_DURATION=0
+    if [[ -n $_MY_CMD_START_TIME ]]; then
+      local end_time=${EPOCHREALTIME}
+      _STARSHIP_LAST_DURATION=$(((end_time - _MY_CMD_START_TIME) * 1000))
+      _STARSHIP_LAST_DURATION=${_STARSHIP_LAST_DURATION%.*}
+    fi
+    unset _MY_CMD_START_TIME
+
+    _starship_build_prompt
+  }
+  add-zsh-hook precmd _starship_precmd
+
+  _starship_zle-keymap-select() {
+    _starship_build_prompt
+    zle reset-prompt
+  }
+  zle -N zle-keymap-select _starship_zle-keymap-select
+
+  _starship_transient_collapse() {
+    if [[ "$CONTEXT" == "start" ]]; then
+      PROMPT="$(starship module character) "
+      RPROMPT=""
+      zle .reset-prompt
+    fi
+  }
+  zle -N zle-line-finish _starship_transient_collapse
+fi
+
+if (($ + commands[nvim])); then
+  alias rg="rg --color=always"
+
+  vi() {
+    if [[ $# -gt 0 ]]; then
+      nvim "$@"
+    else
+
+      local fzf_output
+      fzf_output=$(fd --hidden --exclude .git --exclude node_modules --color=always | fzf --height 50% --reverse --ansi -m --preview 'if [ -d {} ]; then eza --tree --level=1 --color=always --group-directories-first {}; else bat --color=always --style=numbers --line-range=:500 {}; fi' --preview-window=right:50%:border-left)
+
+      if [[ -n "$fzf_output" ]]; then
+        # Create a local variable to hold the Zsh 'split-by-newline' flag
+        eval "nvim \"\${(@f)fzf_output}\"" </dev/tty
+      fi
+    fi
+  }
 fi
 
 if [[ -n "$BREW_PREFIX" ]]; then
-    source <(fzf --zsh)
-    
-    source "$BREW_PREFIX/opt/zsh-vi-mode/share/zsh-vi-mode/zsh-vi-mode.plugin.zsh"
-    zvm_after_init_commands+=(
-        'bindkey "^[[A" history-beginning-search-backward'
-        'bindkey "^[[B" history-beginning-search-forward'
-    )
-    
-    source "$BREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
-    ZSH_AUTOSUGGEST_CLEAR_WIDGETS=(accept-line copy-earlier-word)
-    
-    source "$BREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+  source "$BREW_PREFIX/opt/zsh-vi-mode/share/zsh-vi-mode/zsh-vi-mode.plugin.zsh"
+  zvm_after_init_commands+=(
+    'bindkey "^[[A" history-beginning-search-backward'
+    'bindkey "^[[B" history-beginning-search-forward'
+  )
+
+  source "$BREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+  ZSH_AUTOSUGGEST_CLEAR_WIDGETS=(accept-line copy-earlier-word)
+
+  source "$BREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+fi
+
+# Keep these below zsh-syntax-highlighting
+if (($ + commands[fzf])); then
+  source <(fzf --zsh)
+  export FZF_CTRL_T_OPTS="
+    --preview 'if [ -d {} ]; then eza --tree --level=1 --color=always --group-directories-first {}; else bat --color=always --style=numbers --line-range=:500 {}; fi'
+    --preview-window=right:50%:border-left
+  "
+  export FZF_DEFAULT_COMMAND='fd --hidden --strip-cwd-prefix --exclude .git --exclude node_modules --color=always'
+  export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+  export FZF_ALT_C_COMMAND='fd --type d --hidden --strip-cwd-prefix --exclude .git --exclude node_modules --color=always'
+
+  export FZF_DEFAULT_OPTS="
+    --ansi
+    --color=fg:#c8d3f5,bg:#222436,hl:#82aaff
+    --color=fg+:#c8d3f5,bg+:#2f334d,hl+:#ffc777
+    --color=info:#86e1fc,prompt:#82aaff,pointer:#ffc777
+    --color=marker:#c3e88d,spinner:#c099ff,header:#82aaff
+  "
+
+  bindkey '^[r' fzf-history-widget
+  bindkey -M viins '^[r' fzf-history-widget
+  bindkey -M vicmd '^[r' fzf-history-widget
+  bindkey '^[t' fzf-file-widget
+  bindkey -M viins '^[t' fzf-file-widget
+  bindkey -M vicmd '^[t' fzf-file-widget
+fi
+
+if (($ + commands[zoxide])); then
+  eval "$(zoxide init zsh --cmd cd)"
+
+  zoxide_jump_widget() {
+    local dir="$(zoxide query -i)"
+
+    if [[ -n "$dir" ]]; then
+      cd "$dir"
+      if (($ + functions[_starship_build_prompt])); then
+        _starship_build_prompt
+      fi
+      zle reset-prompt
+    fi
+  }
+  zle -N zoxide_jump_widget
+
+  bindkey '^[c' zoxide_jump_widget
+  bindkey -M viins '^[c' zoxide_jump_widget
+  bindkey -M vicmd '^[c' zoxide_jump_widget
 fi
