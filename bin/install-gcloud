@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -e
+
+INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}"
+GCLOUD_DIR="$INSTALL_DIR/google-cloud-sdk"
+
+# Detect OS
+OS="$(uname -s)"
+case "$OS" in
+  Linux)  OS_EXT="linux" ;;
+  Darwin) OS_EXT="darwin" ;;
+  *) echo "Error: Unsupported OS '$OS'."; exit 1 ;;
+esac
+
+ARCH="$(uname -m)"
+case "$ARCH" in
+  x86_64|amd64) ARCH_EXT="x86_64" ;;
+  arm64|aarch64|armv8l) ARCH_EXT="arm" ;; # Google uses 'arm' for both Mac and Linux arm64
+  *) echo "Error: Unsupported architecture '$ARCH'."; exit 1 ;;
+esac
+
+FILE_NAME="google-cloud-cli-${OS_EXT}-${ARCH_EXT}.tar.gz"
+DOWNLOAD_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/$FILE_NAME"
+
+echo "============================================================"
+echo "☁️  Installing Google Cloud CLI"
+echo "============================================================"
+echo "• OS: $OS"
+echo "• Architecture: $ARCH"
+echo "• Target File: $FILE_NAME"
+echo "• Install Path: $GCLOUD_DIR"
+echo "============================================================"
+
+mkdir -p "$INSTALL_DIR"
+cd "$INSTALL_DIR"
+
+echo "⬇️  Downloading archive..."
+curl -# -O "$DOWNLOAD_URL"
+
+if [[ -d "$GCLOUD_DIR" ]]; then
+  echo "🧹 Removing old installation..."
+  rm -rf "$GCLOUD_DIR"
+fi
+
+echo "📦 Extracting package..."
+tar -xzf "$FILE_NAME"
+
+echo "⚙️  Running Google Cloud setup..."
+"$GCLOUD_DIR/install.sh" --quiet \
+  --usage-reporting=false \
+  --path-update=false \
+  --command-completion=false
+
+# Clean up downloaded tarball
+echo "🗑️  Cleaning up..."
+rm "$FILE_NAME"
+
+echo "============================================================"
+echo "✅ Installation Complete!"
+echo "============================================================"
