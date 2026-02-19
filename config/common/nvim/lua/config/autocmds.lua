@@ -79,3 +79,12 @@ vim.api.nvim_create_autocmd("FileType", {
     vim.treesitter.language.register("starlark", "tiltfile")
   end,
 })
+
+-- Register stow prefix zsh filetypes
+vim.filetype.add({
+  filename = {
+    ["dot-zshrc"] = "zsh",
+    ["dot-zprofile"] = "zsh",
+    ["dot-zshenv"] = "zsh",
+  },
+})
