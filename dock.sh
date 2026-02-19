@@ -2,8 +2,7 @@
 
 # Configuration for the Dock
 ENTRIES=(
-  "/Applications/Slack.app/|apps|"
-  "/Applications/Arc.app/|apps|"
+  "/Applications/Google Chrome.app/|apps|"
   "/Applications/kitty.app/|apps|"
   "/Applications/Bruno.app/|apps|"
 )
