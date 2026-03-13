@@ -2,6 +2,7 @@ return {
   {
     "saghen/blink.cmp",
     dependencies = { "fang2hou/blink-copilot" },
+    build = "cargo build --release",
     opts = {
       sources = {
         per_filetype = {
