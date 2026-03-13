@@ -25,21 +25,30 @@ return {
   {
     "kylechui/nvim-surround",
     event = "VeryLazy",
-    opts = {
-      keymaps = {
-        insert = "gsi",
-        insert_line = "gsI",
-        normal = "gsa",
-        normal_cur = "gsaa",
-        normal_line = "gsA",
-        normal_cur_line = "gsAA",
-        visual = "gsv",
-        visual_line = "gsV",
-        delete = "gsd",
-        change = "gsc",
-        change_line = "gsC",
-      },
-    },
+    init = function()
+      vim.g.nvim_surround_no_insert_mappings = true
+      vim.g.nvim_surround_no_normal_mappings = true
+      vim.g.nvim_surround_no_visual_mappings = true
+    end,
+    config = function()
+      require("nvim-surround").setup({})
+
+      local map = vim.keymap.set
+
+      map("n", "gsa", "<Plug>(nvim-surround-normal)", { desc = "Add surround (motion)" })
+      map("n", "gsaa", "<Plug>(nvim-surround-normal-cur)", { desc = "Add surround (line)" })
+      map("n", "gsA", "<Plug>(nvim-surround-normal-line)", { desc = "Add surround (motion, new line)" })
+      map("n", "gsAA", "<Plug>(nvim-surround-normal-cur-line)", { desc = "Add surround (line, new line)" })
+      map("n", "gsd", "<Plug>(nvim-surround-delete)", { desc = "Delete surround" })
+      map("n", "gsc", "<Plug>(nvim-surround-change)", { desc = "Change surround" })
+      map("n", "gsC", "<Plug>(nvim-surround-change-line)", { desc = "Change surround (new line)" })
+
+      map("x", "gsv", "<Plug>(nvim-surround-visual)", { desc = "Surround selection" })
+      map("x", "gsV", "<Plug>(nvim-surround-visual-line)", { desc = "Surround selection (new line)" })
+
+      map("i", "gsi", "<Plug>(nvim-surround-insert)", { desc = "Insert surround" })
+      map("i", "gsI", "<Plug>(nvim-surround-insert-line)", { desc = "Insert surround (new line)" })
+    end,
   },
   {
     "folke/which-key.nvim",
@@ -48,17 +57,6 @@ return {
       spec = {
         ["gs"] = {
           name = "+surround",
-          a = { "Add surround (motion)" },
-          A = { "Add surround (motion, new line)" },
-          aa = { "Add surround to current line" },
-          AA = { "Add surround to current line, new line" },
-          d = { "Delete surround" },
-          c = { "Change surround" },
-          C = { "Change surround, new line" },
-          v = { "Surround visual selection" },
-          V = { "Surround visual line selection" },
-          i = { "Insert surround (insert mode)" },
-          I = { "Insert surround, new line (insert mode)" },
         },
       },
     },
