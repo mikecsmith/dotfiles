@@ -1,5 +1,5 @@
-from export.markdown import adf_to_markdown
-from export.idempotency import generate_issue_hash
+from jira.markdown import adf_to_markdown
+from jira.idempotency import generate_issue_hash
 
 
 def build_export_hierarchy(raw_issues):

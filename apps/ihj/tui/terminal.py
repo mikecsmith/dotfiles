@@ -66,7 +66,7 @@ def prompt_numeric_menu(options, title, color=C["blue"]):
 def launch_fzf(lines, board_name, mode_name, age, preview_path, bindings):
     """Executes the main FZF interface."""
     list_header = f"{C['bold']}{'ID':<12} P {'TYPE':<10} {'STATUS':<16} {'ASSIGNEE':<16} SUMMARY{C['reset']}"
-    help_guide = f"{C['cyan']}Alt-R{C['reset']} Refresh | {C['cyan']}Alt-S{C['reset']} Mode | {C['cyan']}Alt-A{C['reset']} Assign | {C['cyan']}Alt-T{C['reset']} Move | {C['cyan']}Alt-O{C['reset']} Open | {C['cyan']}Alt-E{C['reset']} Edit | {C['cyan']}Alt-N{C['reset']} Branch"
+    help_guide = f"{C['cyan']}Alt-R{C['reset']} Refresh | {C['cyan']}Alt-S{C['reset']} Mode | {C['cyan']}Alt-A{C['reset']} Assign | {C['cyan']}Alt-T{C['reset']} Transition | {C['cyan']}Alt-O{C['reset']} Open | {C['cyan']}Alt-E{C['reset']} Edit | {C['cyan']}Alt-C{C['reset']} Comment | {C['cyan']}Alt-N{C['reset']} Branch | {C['cyan']}Ctrl-N{C['reset']} New"
 
     fzf_cmd = [
         "fzf",
