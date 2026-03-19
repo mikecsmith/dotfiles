@@ -1,5 +1,0 @@
-**Summary:**
-
-**Expected outcome:**
-
-**Goal:**
