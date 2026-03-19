@@ -14,15 +14,14 @@ def notify_user(msg, title="Jira CLI", use_toast=False):
     if use_toast:
         safe_msg = msg.replace("\\", "\\\\").replace('"', '\\"')
         safe_title = title.replace("\\", "\\\\").replace('"', '\\"')
-        subprocess.run(
-            [
-                "osascript",
-                "-e",
-                f'display notification "{safe_msg}" with title "{safe_title}"',
-            ]
-        )
+
+        script = f'display notification "{safe_msg}" with title "{safe_title}" sound name "Glass"'
+
+        try:
+            subprocess.run(f"osascript -e '{script}'", shell=True, check=False)
+        except Exception:
+            pass
     else:
-        # Standard CLI output
         print(f"\n{C['bold']}{C['cyan']}{title}:{C['reset']} {msg}\n")
 
 
@@ -110,12 +109,18 @@ def open_in_editor(
                 )
             elif target_line:
                 cmd.extend([f"+{target_line}", "-c", "startinsert"])
+            else:
+                cmd.extend(["-c", "startinsert"])
 
         cmd.append(path)
-        subprocess.run(cmd, check=True)
+
+        subprocess.run(cmd, check=True, stdin=sys.stdin, stdout=sys.stdout)
 
         with open(path, "r") as f:
             return f.read()
+    except subprocess.CalledProcessError as e:
+        print(f"Editor Error: {e}")
+        return ""
     finally:
         if os.path.exists(path):
             os.remove(path)

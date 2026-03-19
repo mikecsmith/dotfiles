@@ -18,7 +18,8 @@ def execute_comment(args, server, token, cfg):
     use_toast = "--toast" in args
 
     clean_args = [a for a in args if not a.startswith("-")]
-    if len(clean_args) < 2:
+
+    if not clean_args:
         notify_user("Issue key required for comment.", "Error", use_toast)
         sys.exit(1)
 

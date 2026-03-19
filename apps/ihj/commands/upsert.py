@@ -63,7 +63,7 @@ def generate_schema(cache_dir, cfg, board_slug, board_cfg):
     return schema_path
 
 
-def execute_upsert(args, server, token, cfg):
+def execute_upsert(args, cache_dir, server, token, cfg):
     """The Imperative Shell for the edit/create story."""
     editor_cmd = cfg.get("editor") or os.environ.get("EDITOR", "vim")
 
@@ -95,7 +95,6 @@ def execute_upsert(args, server, token, cfg):
     board_cfg = cfg.get("boards", {}).get(board_slug, {})
     project_key = board_cfg.get("project_key")
 
-    cache_dir = os.path.expanduser("~/.local/state/j/cache")
     schema_path = generate_schema(cache_dir, cfg, board_slug, board_cfg)
     schema_header = f"# yaml-language-server: $schema=file://{schema_path}\n"
 
