@@ -9,19 +9,19 @@ DRY_RUN=""
 
 while getopts "unh" opt; do
   case $opt in
-  u)
-    MODE="-D"
-    ACTION_TEXT="Unlinking"
-    ;;
-  n)
-    DRY_RUN="--simulate"
-    echo "--- DRY RUN MODE ENABLED ---"
-    ;;
-  h)
-    echo "Usage: ./script.sh [-u] [-n]"
-    exit 0
-    ;;
-  *) exit 1 ;;
+    u)
+      MODE="-D"
+      ACTION_TEXT="Unlinking"
+      ;;
+    n)
+      DRY_RUN="--simulate"
+      echo "--- DRY RUN MODE ENABLED ---"
+      ;;
+    h)
+      echo "Usage: ./script.sh [-u] [-n]"
+      exit 0
+      ;;
+    *) exit 1 ;;
   esac
 done
 
@@ -49,11 +49,11 @@ stow $DRY_RUN --dotfiles -v "$MODE" -t "$HOME" home
 echo "$ACTION_TEXT bin..."
 stow $DRY_RUN -v "$MODE" -t "$HOME/.local/bin" bin
 
-J_LINK="$HOME/.local/bin/j"
+IHJ_LINK="$HOME/.local/bin/ihj"
 if [[ "$MODE" == "-D" ]]; then
-  [[ -L "$J_LINK" ]] && [[ -z "$DRY_RUN" ]] && rm "$J_LINK"
+  [[ -L "$IHJ_LINK" ]] && [[ -z "$DRY_RUN" ]] && rm "$IHJ_LINK"
 elif [[ ! -f "bin/j" ]]; then
-  [[ -z "$DRY_RUN" ]] && ln -sf "$DOTFILES_DIR/apps/jira/j" "$J_LINK"
+  [[ -z "$DRY_RUN" ]] && ln -sf "$DOTFILES_DIR/apps/ihj/ihj" "$IHJ_LINK"
 fi
 
 if [[ -d "data" ]]; then
