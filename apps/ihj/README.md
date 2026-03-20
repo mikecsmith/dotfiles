@@ -50,7 +50,7 @@ The CLI looks for its configuration file at `~/.config/ihj/config.yaml`.
 ### Example Configuration
 
 ```yaml
-server: "https://foo-company.atlassian.net"
+server: "[https://foo-company.atlassian.net](https://foo-company.atlassian.net)"
 default_board: "foo"
 editor: "nvim"
 
@@ -162,7 +162,7 @@ While `ihj` launches the interactive dashboard, the tool also features a fully-f
 
 ```bash
 # Launch the dashboard
-ihj tui ci active
+ihj tui foo active
 
 # Safely test what an edit payload would look like without hitting the API
 ihj edit FOO-123 -s "Updated Summary" -S "In Progress" --dry-run
@@ -177,11 +177,14 @@ ihj create -b foo -t Task -s "Fix the database schema" -p High
 
 When you create (`Ctrl-n`) or edit (`Alt-e`) an issue, `ihj` generates a temporary Markdown file with a YAML frontmatter block. If creating a new issue, the body of the markdown file will be pre-populated with the `template` defined for that issue type in your config.
 
-### Editing Workflow
+### Workflow
 
-1.  **Metadata:** Edit the fields inside the `---` blocks (e.g., `status: "In Progress"`).
-2.  **Description:** Write your issue description using standard Markdown below the frontmatter. `ihj` natively converts this into Jira's Atlassian Document Format (ADF) upon saving. If your editor throws an error, the FZF interface will automatically pause and display the trace for debugging.
-3.  **LSP Integration:** If you use Neovim/Vim, `ihj` automatically generates your schema and injects a `# yaml-language-server` directive at the top. This provides instant autocomplete and validation for statuses, types, and custom fields.
+1.  **Metadata:** Edit the fields inside the YAML frontmatter block (e.g., `status: "In Progress"`).
+2.  **Description:** Write your issue description using standard Markdown below the frontmatter. `ihj` natively converts this into Jira's Atlassian Document Format (ADF) upon saving.
+3.  **Resilient Execution:** If Jira rejects your payload (e.g., a missing parent key on a Sub-task), the CLI will halt and provide a Recovery Menu. You can jump back into the editor to fix the error, or rescue your buffer to the clipboard.
+4.  **LSP Integration:** `ihj` automatically generates your JSON schemas based on your config and injects a `# yaml-language-server` directive at the top. This provides instant autocomplete and validation for statuses, types, and custom fields if your editor supports block scoped LSPs.
+
+**Note:** If you exit without making any changes - `ihj` will assume you were aborting and won't show the recovery menu.
 
 ### Configuring Your Editor
 
@@ -196,7 +199,7 @@ Set the `editor` key at the root of your `config.yaml`. Multi-word commands and 
 
 | Key      | Action                                                                                     |
 | :------- | :----------------------------------------------------------------------------------------- |
-| `Enter`  | View issue description / Open in Editor                                                    |
+| `Enter`  | **Close FZF** (Exits the dashboard)                                                        |
 | `Alt-e`  | **Edit** metadata and description                                                          |
 | `Alt-c`  | **Comment** (Opens a blank buffer)                                                         |
 | `Alt-a`  | **Assign** to yourself (Silent)                                                            |
@@ -205,4 +208,21 @@ Set the `editor` key at the root of your `config.yaml`. Multi-word commands and 
 | `Alt-s`  | **Switch** Mode (Active, Me, Backlog, etc.)                                                |
 | `Alt-r`  | **Reload** cache and refresh list                                                          |
 | `Alt-n`  | **Branch** (Copies a `git checkout -b <name>` to the clipboard based on issue key/summary) |
-| `Ctrl-n` | **New** issue creation                                                                     |
+| `Ctrl-n` | **New** issue creation (Numeric menu for type)                                             |
+
+---
+
+## 💡 Tips & Known Limitations
+
+### Clickable Terminal Links
+
+`ihj` uses **OSC 8 terminal hyperlinks**. When viewing issue descriptions or comments in the preview pane, hyperlinks will render cleanly without exposing the raw URL.
+_(Note: If `fzf`'s mouse capture is blocking your click, hold `Shift` while clicking to bypass it and you may also need whatever modifier key your terminal expects)._
+
+### The "FZF Tree" Filtering Quirk
+
+`ihj` natively nests sub-tasks under their parents to create a clean, hierarchical view. However, because `fzf` operates as a flat text filter, it has no concept of parent/child relationships.
+
+If you type a search term that matches a child issue but _not_ its parent, the parent will be filtered out. The child issue will remain visible, but it may look "orphaned" (e.g., `  └─ Fix the DB`) without its parent context above it.
+
+**Workaround:** If you lose track of what an orphaned sub-task belongs to, simply check the preview pane on the right for full context, or press `Backspace` to clear your search query and restore the full visual tree.
