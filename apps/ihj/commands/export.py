@@ -1,19 +1,17 @@
-from jira.client import search_jira
+import sys
 from jira.payloads import build_search_payload, parse_search_response
 from jira.jql_builder import build_jql
 from jira.hierarchy import build_export_hierarchy
 from jira.persistence import save_export_state, write_export_output, build_metadata
 
 
-def execute_export(args, server, token, cfg):
-    """Handles the --export logic: Fetches, organizes, and writes to stdout."""
-    # Find slug and mode from positional args
-    slug = args[0] if len(args) > 0 else cfg.get("default_board", "ci")
-    mode = args[1] if len(args) > 1 else "active"
+def execute_export(slug, mode, client, cfg):
+    """Handles the export logic: Fetches, organizes, and writes to stdout."""
+    board_cfg = cfg.get("boards", {}).get(slug)
 
-    board_cfg = cfg["boards"].get(slug)
     if not board_cfg:
-        return
+        sys.exit(f"Error: Board '{slug}' not found in config.")
+
     board_cfg["slug"] = slug
 
     # Always force a fresh fetch for exports to ensure data integrity
@@ -21,11 +19,13 @@ def execute_export(args, server, token, cfg):
 
     all_issues = []
     next_token = None
+
     while True:
         payload = build_search_payload(jql, cfg["formatted_custom_fields"], next_token)
-        raw_response = search_jira(server, token, payload)
+        raw_response = client.search_issues(payload)
         issues, next_token, is_last = parse_search_response(raw_response)
         all_issues.extend(issues)
+
         if is_last:
             break
 

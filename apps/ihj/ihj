@@ -1,79 +1,76 @@
 #!/usr/bin/env python3
-import os
-import sys
 import webbrowser
-from pathlib import Path
 
-
-from config.io import load_raw_config_file
-from config.processor import validate_config, parse_config
-from tui.formatters import clean_issue_key
+from config.bootstrap import initialize_app
+from jira.client import JiraClient
 
 from commands.upsert import execute_upsert
 from commands.comment import execute_comment
 from commands.assign import execute_assign
 from commands.branch import execute_branch
 from commands.transition import execute_transition
-from commands.list import execute_list
 from commands.export import execute_export
-
-CONFIG_DIR = os.path.expanduser("~/.config/ihj")
-CACHE_DIR = os.path.expanduser("~/.local/state/ihj")
-EXECUTABLE = sys.argv[0]
+from commands.tui import execute_tui
+from commands.list import execute_list
 
 
 def main():
-    Path(CONFIG_DIR).mkdir(parents=True, exist_ok=True)
-    Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
+    # 1. Gather all configuration, args, and environment context
+    ctx = initialize_app()
 
-    try:
-        raw_cfg = load_raw_config_file(f"{CONFIG_DIR}/config.yaml")
-        validate_config(raw_cfg)
-        cfg = parse_config(raw_cfg)
-    except Exception as e:
-        sys.exit(f"Setup Error: {e}")
+    args = ctx["args"]
+    cfg = ctx["cfg"]
 
-    server = cfg.get("server")
-    token = os.environ.get("JIRA_BEARER_TOKEN")
-    if not token:
-        sys.exit("Error: JIRA_BEARER_TOKEN environment variable not set.")
+    # 2. Spin up the Domain Client
+    client = JiraClient(cfg.get("server"), ctx["token"])
 
-    args = sys.argv[1:]
-    use_toast = "--toast" in args
-    clean_args_bg = [a for a in args if a != "--toast"]
+    # 3. Route the command
+    cmd = args.command or "tui"
 
-    # --- Routing Logic ---
+    if cmd == "create":
+        execute_upsert(
+            args, ctx["cache_dir"], client, cfg, ctx["use_toast"], is_edit=False
+        )
 
-    if "--edit" in args or "--create" in args:
-        execute_upsert(args, CACHE_DIR, server, token, cfg)
-        sys.exit(0)
+    elif cmd == "edit":
+        execute_upsert(
+            args, ctx["cache_dir"], client, cfg, ctx["use_toast"], is_edit=True
+        )
 
-    if "--comment" in args:
-        execute_comment(args, server, token, cfg)
-        sys.exit(0)
+    elif cmd == "comment":
+        execute_comment(args.issue_key, client, cfg, ctx["use_toast"], args.dry_run)
 
-    if "--assign" in args:
-        execute_assign(clean_args_bg, CACHE_DIR, server, token, use_toast)
-        sys.exit(0)
+    elif cmd == "assign":
+        execute_assign(args.issue_key, ctx["cache_dir"], client, ctx["use_toast"])
 
-    if "--branch" in args:
-        execute_branch(clean_args_bg, CACHE_DIR, use_toast)
-        sys.exit(0)
+    elif cmd == "branch":
+        execute_branch(
+            args.issue_key,
+            getattr(args, "board", None),
+            ctx["cache_dir"],
+            ctx["use_toast"],
+        )
 
-    if "--transition" in args:
-        execute_transition(clean_args_bg, server, token, cfg)
-        sys.exit(0)
+    elif cmd == "transition":
+        execute_transition(args.issue_key, client, cfg, ctx["use_toast"])
 
-    if "--open" in args:
-        clean_key = clean_issue_key(clean_args_bg[-1])
-        webbrowser.open(f"{server}/browse/{clean_key}")
-        sys.exit(0)
+    elif cmd == "open":
+        webbrowser.open(f"{client.server}/browse/{args.issue_key}")
 
-    if "--export" in args:
-        execute_export(clean_args_bg, server, token, cfg)
-        sys.exit(0)
+    elif cmd == "export":
+        board = getattr(args, "board", None) or cfg.get("default_board", "ci")
+        mode = getattr(args, "mode", None) or "active"
+        execute_export(board, mode, client, cfg)
 
-    execute_list(args, CACHE_DIR, EXECUTABLE, server, token, cfg)
+    elif cmd == "list":
+        board = getattr(args, "board", None) or cfg.get("default_board", "ci")
+        mode = getattr(args, "mode", None) or "active"
+        execute_list(board, mode, ctx["cache_dir"], client, cfg)
+
+    elif cmd == "tui":
+        board = getattr(args, "board", None) or cfg.get("default_board", "ci")
+        mode = getattr(args, "mode", None) or "active"
+        execute_tui(board, mode, ctx["cache_dir"], ctx["executable"], client, cfg)
 
 
 if __name__ == "__main__":
