@@ -1,5 +1,5 @@
 def generate_frontmatter_schema(cfg, board_cfg):
-    """Pure: Generates the JSON Schema dictionary for the YAML language server."""
+    """Generates the JSON Schema dictionary with conditional logic for Sub-tasks."""
     types = [t["name"] for t in cfg.get("types", [])]
     transitions = board_cfg.get("transitions", [])
 
@@ -24,12 +24,20 @@ def generate_frontmatter_schema(cfg, board_cfg):
         else:
             properties[cf_name] = {"type": "string"}
 
-    return {
+    schema = {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": properties,
         "required": ["summary", "type"],
+        "allOf": [
+            {
+                "if": {"properties": {"type": {"const": "Sub-task"}}},
+                "then": {"required": ["parent"]},
+            }
+        ],
     }
+
+    return schema
 
 
 def build_frontmatter_doc(schema_path, metadata, body_text):

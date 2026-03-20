@@ -1,8 +1,6 @@
 import os
 import subprocess
 import sys
-import termios
-import tty
 import shutil
 
 from constants import C
@@ -62,30 +60,58 @@ def get_terminal_width():
     return shutil.get_terminal_size((120, 24)).columns
 
 
-def prompt_numeric_menu(options, title, color=C["blue"]):
-    """Numeric TUI selector using raw mode."""
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
+def prompt_numeric_menu(options, title, color=C["blue"], subtitle=None):
+    """Numeric TUI selector using standard input for multi-digit support."""
     try:
-        tty.setraw(fd)
         sys.stdout.write("\033[?1049h\033[2J\033[H")
-        sys.stdout.write(f"{C['bold']}{color} {title} {C['reset']}\r\n\r\n")
+        sys.stdout.write(f"{C['bold']}{color} {title} {C['reset']}\n")
+
+        if subtitle:
+            sys.stdout.write(f"\n{subtitle}\n")
+
+        sys.stdout.write("\n")
+
         for i, opt in enumerate(options):
-            sys.stdout.write(f"  [{i + 1}] {opt}\r\n")
-        sys.stdout.write(f"\r\n{C['dim']}Choice (q to cancel): {C['reset']}")
+            sys.stdout.write(f"  [{i + 1}] {opt}\n")
+
         sys.stdout.flush()
 
         while True:
-            char = sys.stdin.read(1)
-            if char == "q" or char == "\x1b":
+            choice = (
+                input(
+                    f"\n{C['dim']}Choice (q to cancel, enter to confirm): {C['reset']}"
+                )
+                .strip()
+                .lower()
+            )
+
+            if choice == "q":
                 return None
-            if char.isdigit():
-                idx = int(char) - 1
+
+            if choice.isdigit():
+                idx = int(choice) - 1
                 if 0 <= idx < len(options):
                     return idx
+
+            print(
+                f"{C['red']}Invalid choice. Please select 1-{len(options)}.{C['reset']}"
+            )
+
+            if choice == "q":
+                return None
+            if choice.isdigit():
+                idx = int(choice) - 1
+                if 0 <= idx < len(options):
+                    return idx
+            print(
+                f"{C['red']}Invalid choice. Please select 1-{len(options)}.{C['reset']}"
+            )
+
+    except (KeyboardInterrupt, EOFError):
+        return None
     finally:
         sys.stdout.write("\033[?1049l")
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        sys.stdout.flush()
 
 
 def launch_fzf(lines, board_name, mode_name, age, preview_path, bindings):
