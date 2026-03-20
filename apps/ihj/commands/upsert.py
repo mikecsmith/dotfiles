@@ -1,18 +1,11 @@
 import os
 import sys
-import json
 
-from config.io import parse_yaml_string
-from tui.terminal import prompt_numeric_menu, notify_user, open_in_editor
-from jira.client import (
-    search_jira,
-    update_issue,
-    fetch_transitions,
-    fetch_active_sprint,
-    add_to_sprint,
-)
-
-from tui.formatters import clean_issue_key
+from config.schema import generate_frontmatter_schema, build_frontmatter_doc
+from config.io import write_frontmatter_schema_file, parse_yaml_string
+from tui.terminal import notify_user, prompt_numeric_menu
+from tui.editor import open_in_editor, calculate_cursor_target
+from tui.dry_run import print_dry_run
 from jira.markdown import adf_to_markdown, split_frontmatter_and_body, markdown_to_adf
 from jira.payloads import (
     build_search_payload,
@@ -20,361 +13,214 @@ from jira.payloads import (
     build_upsert_payload,
     build_transition_payload,
 )
+from jira.workflows import get_transition_id, perform_transition, assign_to_sprint
 from constants import C
 
 
-def generate_schema(cache_dir, cfg, board_slug, board_cfg):
-    """Pure-ish: Generates the JSON Schema for the YAML language server dynamically."""
-    schema_path = os.path.join(cache_dir, f"frontmatter.{board_slug}.schema.json")
-    types = [t["name"] for t in cfg.get("types", [])]
-    transitions = board_cfg.get("transitions", [])
-
-    properties = {
-        "key": {"type": "string"},
-        "summary": {"type": "string"},
-        "type": {"type": "string", "enum": types},
-        "priority": {
-            "type": "string",
-            "enum": ["Highest", "High", "Medium", "Low", "Lowest"],
-        },
-        "status": {"type": "string", "enum": transitions}
-        if transitions
-        else {"type": "string"},
-        "parent": {"type": "string"},
-        "sprint": {"type": "boolean"},
-    }
-
-    for cf_name in cfg.get("custom_fields", {}).keys():
-        if cf_name == "team":
-            properties["team"] = {"type": "boolean"}
-        else:
-            properties[cf_name] = {"type": "string"}
-
-    schema = {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "type": "object",
-        "properties": properties,
-        "required": ["summary", "type"],
-    }
-
-    with open(schema_path, "w") as f:
-        json.dump(schema, f, indent=2)
-
-    return schema_path
-
-
-def execute_upsert(args, cache_dir, server, token, cfg):
-    """The Imperative Shell for the edit/create story."""
+def execute_upsert(args, cache_dir, client, cfg, use_toast, is_edit=False):
     editor_cmd = cfg.get("editor") or os.environ.get("EDITOR", "vim")
+    is_dry_run = getattr(args, "dry_run", False)
 
-    summary_val = ""
-    board_slug = None
-    clean_args = []
-
-    skip_next = False
-    for i, arg in enumerate(args):
-        if skip_next:
-            skip_next = False
-            continue
-        if arg in ("-s", "--summary"):
-            summary_val = args[i + 1] if i + 1 < len(args) else ""
-            skip_next = True
-        elif arg in ("-b", "--board"):
-            board_slug = args[i + 1] if i + 1 < len(args) else None
-            skip_next = True
-        else:
-            clean_args.append(arg)
-
-    is_edit = "--edit" in clean_args
-    is_dry_run = "--dry-run" in clean_args
-    use_toast = "--toast" in clean_args
-
-    if not board_slug:
-        board_slug = cfg.get("default_board", "ci")
-
+    board_slug = getattr(args, "board", None) or cfg.get("default_board", "ci")
     board_cfg = cfg.get("boards", {}).get(board_slug, {})
-    project_key = board_cfg.get("project_key")
 
-    schema_path = generate_schema(cache_dir, cfg, board_slug, board_cfg)
-    schema_header = f"# yaml-language-server: $schema=file://{schema_path}\n"
+    schema_dict = generate_frontmatter_schema(cfg, board_cfg)
+    schema_path = write_frontmatter_schema_file(cache_dir, board_slug, schema_dict)
 
-    current_status = None
+    metadata = {}
+    body_text = ""
+    orig_status = ""
+    issue_key = None
 
-    # ==========================================
-    # 1. SETUP & FETCH
-    # ==========================================
+    # --- 1. DATA GATHERING (Fetch vs Template) ---
     if is_edit:
-        positionals = [a for a in clean_args if not a.startswith("--")]
-        if not positionals:
-            notify_user("Issue key required for edit.", "Error", use_toast)
+        issue_key_raw = getattr(args, "issue_key", None)
+        if not issue_key_raw:
+            notify_user("Issue key is required for edit.", "Error", use_toast)
             sys.exit(1)
+        issue_key = str(issue_key_raw)
 
-        clean_key = clean_issue_key(positionals[-1])
-        jql = f"key = {clean_key}"
-
-        search_payload = build_search_payload(
-            jql, cfg.get("formatted_custom_fields", {})
+        payload = build_search_payload(
+            f"key = {issue_key}", cfg.get("formatted_custom_fields", {})
         )
-        raw_response = search_jira(server, token, search_payload)
+        raw_response = client.search_issues(payload)
         issues, _, _ = parse_search_response(raw_response)
 
         if not issues:
-            notify_user(f"Could not find issue {clean_key}", "Edit Error", use_toast)
+            notify_user(f"Issue {issue_key} not found.", "Error", use_toast)
             sys.exit(1)
 
         fields = issues[0].get("fields", {})
+        orig_status = fields.get("status", {}).get("name", "")
 
-        current_type = fields.get("issuetype", {}).get("name", "")
-        current_summary = summary_val if summary_val else fields.get("summary", "")
-        current_status = fields.get("status", {}).get("name", "")
-        current_priority = fields.get("priority", {}).get("name", "Medium")
-        current_parent = fields.get("parent", {}).get("key", "")
+        metadata = {
+            "key": issue_key,
+            "type": getattr(args, "type", None)
+            or fields.get("issuetype", {}).get("name", ""),
+            "priority": getattr(args, "priority", None)
+            or fields.get("priority", {}).get("name", "Medium"),
+            "status": getattr(args, "status", None) or orig_status,
+            "parent": getattr(args, "parent", None)
+            or fields.get("parent", {}).get("key", ""),
+            "summary": getattr(args, "summary", None) or fields.get("summary", ""),
+        }
 
-        md_desc = adf_to_markdown(fields.get("description")).strip()
-
-        custom_fields_yaml = ""
         for cf_name, cf_id in cfg.get("custom_fields", {}).items():
             if cf_name == "team":
-                custom_fields_yaml += "team: true\n"
+                metadata["team"] = getattr(args, "team", None) or "true"
             else:
                 val = fields.get(f"customfield_{cf_id}")
                 if val:
-                    if isinstance(val, dict):
-                        val = val.get("value", "") or val.get("name", "")
-                    custom_fields_yaml += f'{cf_name}: "{val}"\n'
+                    val_str = (
+                        val.get("value") or val.get("name")
+                        if isinstance(val, dict)
+                        else val
+                    )
+                    metadata[cf_name] = val_str
 
-        # Only insert parent if it actually exists
-        parent_yaml = f'parent: "{current_parent}"\n' if current_parent else ""
+        body_text = adf_to_markdown(fields.get("description")).strip()
 
-        initial_doc = (
-            f"---\n"
-            f"{schema_header}"
-            f"key: {clean_key}\n"
-            f'type: "{current_type}"\n'
-            f'priority: "{current_priority}"\n'
-            f'status: "{current_status}"\n'
-            f"{parent_yaml}"
-            f"{custom_fields_yaml}"
-            f'summary: "{current_summary}"\n'
-            f"---\n\n"
-            f"{md_desc}"
-        )
     else:
         types = [t["name"] for t in cfg.get("types", [])]
-        choice_idx = prompt_numeric_menu(types, "CREATE NEW ISSUE", color=C["green"])
-        if choice_idx is None:
-            sys.exit(0)
+        selected_type = getattr(args, "type", None)
+        if not selected_type:
+            choice_idx = prompt_numeric_menu(
+                types, "CREATE NEW ISSUE", color=C["green"]
+            )
+            if choice_idx is None:
+                sys.exit(0)
+            selected_type = types[choice_idx]
 
-        selected_type = types[choice_idx]
         type_cfg = next(
             (t for t in cfg.get("types", []) if t["name"] == selected_type), {}
         )
-        template_body = type_cfg.get("template", "").strip()
+        orig_status = "Backlog"
 
-        custom_fields_yaml = (
-            "team: true\n" if "team" in cfg.get("custom_fields", {}) else ""
-        )
+        metadata = {
+            "type": selected_type,
+            "priority": getattr(args, "priority", None) or "Medium",
+            "status": getattr(args, "status", None) or orig_status,
+            "parent": getattr(args, "parent", None),
+            "summary": getattr(args, "summary", None) or "",
+        }
 
-        initial_doc = (
-            f"---\n"
-            f"{schema_header}"
-            f'type: "{selected_type}"\n'
-            f'priority: "Medium"\n'
-            f'status: "Backlog"\n'
-            f"{custom_fields_yaml}"
-            f'summary: "{summary_val}"\n'
-            f"---\n\n"
-            f"{template_body}"
-        )
+        if "team" in cfg.get("custom_fields", {}):
+            metadata["team"] = getattr(args, "team", None) or "true"
 
-    # ==========================================
-    # 2. USER INTERACTION
-    # ==========================================
-    target_line = None
-    search_pattern = None
+        body_text = type_cfg.get("template", "").strip()
 
-    if summary_val:
-        lines = initial_doc.split("\n")
-        dash_count = 0
-        for idx, line in enumerate(lines):
-            if line.strip() == "---":
-                dash_count += 1
-                if dash_count == 2:
-                    target_line = idx + 2
-                    break
-    else:
-        search_pattern = "^summary:"
+    # --- 2. EDITOR LIFECYCLE ---
+    initial_doc = build_frontmatter_doc(schema_path, metadata, body_text)
 
-    raw_modified_doc = open_in_editor(
+    target_line, search_pattern = calculate_cursor_target(
+        initial_doc, metadata.get("summary")
+    )
+    raw_modified = open_in_editor(
         editor_cmd, initial_doc, target_line=target_line, search_pattern=search_pattern
     )
 
-    # ==========================================
-    # 3. IDEMPOTENCY CHECK
-    # ==========================================
-    # If the user saved and quit without changing a single character, cleanly exit.
-    if raw_modified_doc.strip() == initial_doc.strip():
-        print(
-            f"\n{C['dim']}No changes detected. Skipping update.{C['reset']}"
-        ) if is_dry_run else notify_user("No changes made.", "Skipped", use_toast)
+    if raw_modified.strip() == initial_doc.strip():
+        if is_dry_run:
+            print_dry_run("ABORTED", message="No changes detected.")
+        else:
+            notify_user("No changes made.", "Skipped", use_toast)
         sys.exit(0)
 
-    # ==========================================
-    # 4. PARSING & TRANSFORMATION
-    # ==========================================
-    yaml_str, md_body = split_frontmatter_and_body(raw_modified_doc)
-    frontmatter_dict = parse_yaml_string(yaml_str)
+    # --- 3. PARSING & VALIDATION ---
+    yaml_str, md_body = split_frontmatter_and_body(raw_modified)
+    fm = parse_yaml_string(yaml_str)
 
-    if not frontmatter_dict or not frontmatter_dict.get("summary"):
-        notify_user("Aborted: Summary is required.", "Upsert Cancelled", use_toast)
+    if not fm or not fm.get("summary"):
+        notify_user("Aborted: Summary is required.", "Error", use_toast)
         sys.exit(1)
 
     adf_body = markdown_to_adf(md_body)
 
-    issue_key = frontmatter_dict.get("key")
-    pk_to_pass = None if issue_key else project_key
-    team_uuid = board_cfg.get("team_uuid")
-
+    # --- 4. EXECUTE UPSERT (PUT vs POST) ---
     upsert_payload = build_upsert_payload(
-        frontmatter_dict,
+        fm,
         adf_body,
-        cfg.get("types", []),
-        cfg.get("custom_fields", {}),
-        pk_to_pass,
-        team_uuid,
+        cfg["types"],
+        cfg["custom_fields"],
+        project_key=board_cfg.get("project_key"),
+        team_uuid=board_cfg.get("team_uuid"),
     )
 
-    # ==========================================
-    # 5. NETWORK EXECUTION: UPSERT
-    # ==========================================
-    target_key = None
-
+    target_key = issue_key
     if is_dry_run:
-        print(
-            f"\n{C['bg_gray']}{C['bold']}{C['cyan']} 🚧 DRY RUN: PRIMARY UPSERT PAYLOAD 🚧 {C['reset']}\n"
-        )
-        print(json.dumps(upsert_payload, indent=2))
-        target_key = issue_key.upper() if issue_key else "DRYRUN-999"
+        target_key = target_key or "DRYRUN-999"
+        print_dry_run(f"UPSERT PAYLOAD ({target_key})", data=upsert_payload)
     else:
-        if issue_key:
-            success = update_issue(
-                server,
-                token,
-                f"issue/{issue_key.upper()}",
-                upsert_payload,
-                method="PUT",
-            )
-            if success:
-                notify_user(f"Successfully updated {issue_key}", "Jira Edit", use_toast)
-                target_key = issue_key.upper()
-            else:
-                notify_user(f"Failed to update {issue_key}", "Jira Error", use_toast)
+        if is_edit:
+            if not client.put(f"/rest/api/3/issue/{issue_key}", upsert_payload):
+                notify_user(f"Failed to update {issue_key}", "Error", use_toast)
                 sys.exit(1)
+            notify_user(f"Successfully updated {issue_key}", "Jira Edit", use_toast)
         else:
-            response = update_issue(
-                server, token, "issue", upsert_payload, method="POST"
-            )
+            response = client.post("/rest/api/3/issue", upsert_payload)
             if response and isinstance(response, dict) and "key" in response:
-                target_key = response["key"]
+                target_key = str(response["key"])
                 notify_user(
                     f"Successfully created {target_key}", "Jira Create", use_toast
                 )
             else:
-                notify_user("Failed to create issue", "Jira Error", use_toast)
+                notify_user("Failed to create issue", "Error", use_toast)
                 sys.exit(1)
 
-    # ==========================================
-    # 6. NETWORK EXECUTION: SPRINT ASSIGNMENT
-    # ==========================================
-    if frontmatter_dict.get("sprint"):
-        board_id = board_cfg.get("id")
+    # --- 5. POST-UPSERT ACTIONS ---
+    if fm.get("sprint"):
         if is_dry_run:
-            print(
-                f"\n{C['bg_gray']}{C['bold']}{C['blue']} 🏃 DRY RUN: SPRINT ADDITION 🏃 {C['reset']}\n"
+            print_dry_run(
+                "SPRINT ADDITION",
+                message=f"Target: {target_key} | Board ID: {board_cfg.get('id')}",
             )
-            print(f"{C['dim']}Target Issue:{C['reset']} {target_key}")
-            print(f"{C['dim']}Board ID:{C['reset']} {board_id}")
         else:
-            sprint_id = fetch_active_sprint(server, token, board_id)
-            if sprint_id:
-                s_success = add_to_sprint(server, token, sprint_id, target_key)
-                if s_success:
-                    notify_user(
-                        f"Added {target_key} to active sprint.",
-                        "Sprint Update",
-                        use_toast,
-                    )
+            success, sprint_id = assign_to_sprint(
+                client, board_cfg.get("id"), target_key
+            )
+            if success:
+                notify_user(
+                    f"Added {target_key} to active sprint.", "Sprint Update", use_toast
+                )
+            elif sprint_id is None:
+                notify_user(
+                    "No active sprint found for board.", "Sprint Warning", use_toast
+                )
+            else:
+                notify_user(
+                    f"Failed to add {target_key} to sprint.", "Sprint Error", use_toast
+                )
+
+    new_status = fm.get("status")
+    if new_status and new_status.lower() != orig_status.lower():
+        tid = get_transition_id(client, target_key, new_status)
+
+        if is_dry_run:
+            if tid:
+                print_dry_run(
+                    "STATUS TRANSITION",
+                    data=build_transition_payload(tid),
+                    message=f"Path: {orig_status} -> {new_status} (ID: {tid})",
+                )
+            else:
+                print_dry_run(
+                    "INVALID TRANSITION",
+                    message=f"'{new_status}' is not a valid transition path.",
+                )
+        else:
+            if tid:
+                if perform_transition(client, target_key, tid):
+                    notify_user(f"Moved to {new_status}", str(target_key), use_toast)
                 else:
                     notify_user(
-                        f"Failed to add {target_key} to sprint.",
-                        "Sprint Error",
+                        f"Failed to move {target_key} to {new_status}",
+                        "Error",
                         use_toast,
                     )
             else:
                 notify_user(
-                    "No active sprint found for board.", "Sprint Warning", use_toast
+                    f"Invalid status transition: '{new_status}'", "Warning", use_toast
                 )
 
-    # ==========================================
-    # 7. NETWORK EXECUTION: TRANSITION
-    # ==========================================
-    new_status = frontmatter_dict.get("status")
-
-    if (
-        new_status
-        and target_key
-        and new_status.lower() != (current_status or "").lower()
-    ):
-        if not is_edit and new_status.lower() == "backlog":
-            pass
-        else:
-            transitions = (
-                fetch_transitions(server, token, target_key)
-                if target_key != "DRYRUN-999"
-                else [{"id": "99", "name": new_status}]
-            )
-
-            target_transition_id = None
-            for t in transitions:
-                if (
-                    t.get("name", "").lower() == new_status.lower()
-                    or t.get("to", {}).get("name", "").lower() == new_status.lower()
-                ):
-                    target_transition_id = t["id"]
-                    break
-
-            if target_transition_id:
-                t_payload = build_transition_payload(target_transition_id)
-                if is_dry_run:
-                    print(
-                        f"\n{C['bg_gray']}{C['bold']}{C['magenta']} 🚀 DRY RUN: STATUS TRANSITION 🚀 {C['reset']}\n"
-                    )
-                    print(json.dumps(t_payload, indent=2))
-                else:
-                    t_success = update_issue(
-                        server,
-                        token,
-                        f"issue/{target_key}/transitions",
-                        t_payload,
-                        method="POST",
-                    )
-                    if t_success:
-                        notify_user(
-                            f"Moved {target_key} to {new_status}",
-                            "Jira Upsert",
-                            use_toast,
-                        )
-                    else:
-                        notify_user(
-                            f"Failed to move {target_key} to {new_status}",
-                            "Jira Error",
-                            use_toast,
-                        )
-            else:
-                msg = f"Invalid status transition: '{new_status}'"
-                print(
-                    f"\n{C['red']}{C['bold']} ⚠ WARNING: {msg} {C['reset']}"
-                ) if is_dry_run else notify_user(msg, "Jira Warning", use_toast)
-
     if is_dry_run:
-        input(f"\n{C['bold']}Dry run complete. Press Enter to return...{C['reset']}")
+        input(f"\n{C['bold']}Press Enter to finish dry run...{C['reset']}")

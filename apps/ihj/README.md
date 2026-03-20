@@ -4,7 +4,9 @@
 > **PRE-ALPHA SOFTWARE: USE AT YOUR OWN RISK**
 > This tool is currently in a "works on my machine" state. It performs direct write operations to your Jira instance. It may delete your favorite sub-tasks, rename your Epics, or simply crash and lose your unsaved 500-word comment. You have been warned.
 
-`ihj` is a lightweight, Python-native TUI designed to get you in and out of Jira as fast as possible. It's just `fzf`, `yq`, your favorite editor, and the Python standard library.
+`ihj` is a lightweight, clean-architecture, Python-native TUI designed to get you in and out of Jira as fast as possible. It bridges the gap between a fast FZF dashboard, your local editor, and the Jira API.
+
+Supports macOS and Linux natively.
 
 ---
 
@@ -14,6 +16,11 @@ You must have the following installed and available in your `$PATH`:
 
 1.  **[fzf](https://github.com/junegunn/fzf):** The fuzzy finder that powers the main UI.
 2.  **[yq](https://github.com/mikefarah/yq):** The Go-based YAML processor (specifically the Mike Farah version).
+
+**Optional OS Integrations (for Branch Copying & Toasts):**
+
+- **macOS:** Uses built-in `pbcopy` and `osascript`.
+- **Linux:** Install `wl-copy` (Wayland) or `xclip` / `xsel` (X11) for clipboard support. Install `notify-send` for desktop notifications.
 
 ---
 
@@ -65,7 +72,7 @@ boards:
     modes:
       active: "(statusCategory != Done) OR (statusCategory = Done AND status changed TO Done AFTER -2w)"
       all: ""
-      my: "assignee = currentUser()"
+      me: "assignee = currentUser()"
       backlog: "statusCategory = 'To Do'"
     transitions:
       - "Backlog"
@@ -149,6 +156,23 @@ _Example resulting JQL for the `my` mode:_
 
 ---
 
+## 🚀 CLI Usage & Dry Runs
+
+While `ihj` launches the interactive dashboard, the tool also features a fully-featured CLI for direct operations, complete with contextual help (`ihj <command> -h`).
+
+```bash
+# Launch the dashboard
+ihj tui ci active
+
+# Safely test what an edit payload would look like without hitting the API
+ihj edit FOO-123 -s "Updated Summary" -S "In Progress" --dry-run
+
+# Direct issue creation
+ihj create -b foo -t Task -s "Fix the database schema" -p High
+```
+
+---
+
 ## 📝 Editor Integration
 
 When you create (`Ctrl-n`) or edit (`Alt-e`) an issue, `ihj` generates a temporary Markdown file with a YAML frontmatter block. If creating a new issue, the body of the markdown file will be pre-populated with the `template` defined for that issue type in your config.
@@ -156,14 +180,14 @@ When you create (`Ctrl-n`) or edit (`Alt-e`) an issue, `ihj` generates a tempora
 ### Editing Workflow
 
 1.  **Metadata:** Edit the fields inside the `---` blocks (e.g., `status: "In Progress"`).
-2.  **Description:** Write your issue description using standard Markdown below the frontmatter. `ihj` natively converts this into Jira's Atlassian Document Format (ADF) upon saving.
-3.  **LSP Integration:** If you use Neovim/Vim, `ihj` injects a `# yaml-language-server` directive at the top. This provides instant autocomplete and validation for statuses, types, and custom fields if you can figure out how to configure nvim to only run yamlls on the frontmatter (working on it!).
+2.  **Description:** Write your issue description using standard Markdown below the frontmatter. `ihj` natively converts this into Jira's Atlassian Document Format (ADF) upon saving. If your editor throws an error, the FZF interface will automatically pause and display the trace for debugging.
+3.  **LSP Integration:** If you use Neovim/Vim, `ihj` automatically generates your schema and injects a `# yaml-language-server` directive at the top. This provides instant autocomplete and validation for statuses, types, and custom fields.
 
 ### Configuring Your Editor
 
-Set the `editor` key at the root of your `config.yaml`.
+Set the `editor` key at the root of your `config.yaml`. Multi-word commands and arguments are fully supported. If omitted, the CLI falls back to your `$EDITOR` environment variable, or `vim`.
 
-- **Vim / Neovim:** `editor: "nvim"` (Native support; automatically drops into insert mode).
+- **Vim / Neovim:** `editor: "nvim"` (Native support; automatically drops into insert mode at the exact line of your summary).
 - **VS Code:** `editor: "code --wait"` (The `--wait` flag is **mandatory**. `ihj` must wait for you to close the editor tab before reading the file and pushing to Jira).
 
 ---
@@ -176,9 +200,9 @@ Set the `editor` key at the root of your `config.yaml`.
 | `Alt-e`  | **Edit** metadata and description                                                          |
 | `Alt-c`  | **Comment** (Opens a blank buffer)                                                         |
 | `Alt-a`  | **Assign** to yourself (Silent)                                                            |
-| `Alt-t`  | **Transition** status (Dropdown menu)                                                      |
+| `Alt-t`  | **Transition** status (Numeric menu)                                                       |
 | `Alt-o`  | **Open** in browser                                                                        |
-| `Alt-s`  | **Switch** Mode (Active, My, Backlog, etc.)                                                |
+| `Alt-s`  | **Switch** Mode (Active, Me, Backlog, etc.)                                                |
 | `Alt-r`  | **Reload** cache and refresh list                                                          |
 | `Alt-n`  | **Branch** (Copies a `git checkout -b <name>` to the clipboard based on issue key/summary) |
 | `Ctrl-n` | **New** issue creation                                                                     |

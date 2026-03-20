@@ -1,7 +1,6 @@
 import os
 import subprocess
 import sys
-import tempfile
 import termios
 import tty
 import shutil
@@ -10,25 +9,52 @@ from constants import C
 
 
 def notify_user(msg, title="Jira CLI", use_toast=False):
-    """Sends a macOS desktop notification OR prints to console."""
+    """Sends a desktop notification (macOS/Linux) OR prints to console."""
     if use_toast:
         safe_msg = msg.replace("\\", "\\\\").replace('"', '\\"')
         safe_title = title.replace("\\", "\\\\").replace('"', '\\"')
 
-        script = f'display notification "{safe_msg}" with title "{safe_title}" sound name "Glass"'
+        platform = getattr(sys, "platform", "")
 
-        try:
-            subprocess.run(f"osascript -e '{script}'", shell=True, check=False)
-        except Exception:
-            pass
+        if platform == "darwin":
+            script = f'display notification "{safe_msg}" with title "{safe_title}" sound name "Glass"'
+            try:
+                subprocess.run(["osascript", "-e", script], check=False)
+            except Exception:
+                pass
+        elif platform.startswith("linux"):
+            if shutil.which("notify-send"):
+                try:
+                    subprocess.run(["notify-send", safe_title, safe_msg], check=False)
+                except Exception:
+                    pass
     else:
         print(f"\n{C['bold']}{C['cyan']}{title}:{C['reset']} {msg}\n")
 
 
 def copy_to_clipboard(text):
-    """Pipes text to macOS pbcopy."""
-    p = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE)
-    p.communicate(input=text.encode("utf-8"))
+    """Pipes text to the system clipboard gracefully across OSs."""
+    cmds = []
+
+    platform = getattr(sys, "platform", "")
+
+    if platform == "darwin":
+        cmds = [["pbcopy"]]
+    elif platform.startswith("linux"):
+        cmds = [
+            ["wl-copy"],
+            ["xclip", "-selection", "clipboard"],
+            ["xsel", "--clipboard", "--input"],
+        ]
+
+    for cmd in cmds:
+        if shutil.which(cmd[0]):
+            try:
+                p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+                p.communicate(input=text.encode("utf-8"))
+                return
+            except Exception:
+                pass
 
 
 def get_terminal_width():
@@ -88,39 +114,12 @@ def launch_fzf(lines, board_name, mode_name, age, preview_path, bindings):
     for key, action in bindings.items():
         fzf_cmd.extend(["--bind", f"{key}:{action}"])
 
-    subprocess.run(fzf_cmd, input="\n".join([list_header] + lines), text=True)
+    fzf_env = os.environ.copy()
+    fzf_env["IHJ_IS_FZF"] = "1"
 
-
-def open_in_editor(
-    editor_cmd, initial_text, prefix="jira_", target_line=None, search_pattern=None
-):
-    """Writes text to tempfile, hands TTY to editor, reads back result."""
-    fd, path = tempfile.mkstemp(prefix=prefix, suffix=".md")
-    try:
-        with os.fdopen(fd, "w") as f:
-            f.write(initial_text)
-
-        cmd = [editor_cmd]
-
-        if any(v in editor_cmd.lower() for v in ["vim", "nvim", "vi"]):
-            if search_pattern:
-                cmd.extend(
-                    ["-c", f"/{search_pattern}", "-c", "normal! $", "-c", "startinsert"]
-                )
-            elif target_line:
-                cmd.extend([f"+{target_line}", "-c", "startinsert"])
-            else:
-                cmd.extend(["-c", "startinsert"])
-
-        cmd.append(path)
-
-        subprocess.run(cmd, check=True, stdin=sys.stdin, stdout=sys.stdout)
-
-        with open(path, "r") as f:
-            return f.read()
-    except subprocess.CalledProcessError as e:
-        print(f"Editor Error: {e}")
-        return ""
-    finally:
-        if os.path.exists(path):
-            os.remove(path)
+    subprocess.run(
+        fzf_cmd,
+        input="\n".join([list_header] + lines),
+        text=True,
+        env=fzf_env,
+    )

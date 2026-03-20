@@ -1,87 +1,94 @@
 import json
 import urllib.request
 import urllib.error
+from typing import Optional, Union
 
 
-def search_jira(server, token, payload):
-    """Impure: Executes the search POST request."""
-    url = f"{server}/rest/api/3/search/jql"
-    req = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST")
-    req.add_header("Authorization", f"Basic {token}")
-    req.add_header("Content-Type", "application/json")
+class JiraClient:
+    def __init__(self, server: str, token: str):
+        self.server = server.rstrip("/")
+        self.token = token
 
-    try:
+    def _build_request(
+        self, path: str, payload: Optional[dict] = None, method: str = "GET"
+    ) -> urllib.request.Request:
+        """Private helper to build the HTTP request with standard Jira headers."""
+        url = f"{self.server}{path}"
+        data = json.dumps(payload).encode() if payload else None
+
+        req = urllib.request.Request(url, data=data, method=method)
+        req.add_header("Authorization", f"Basic {self.token}")
+
+        if payload is not None or method in ["POST", "PUT"]:
+            req.add_header("Content-Type", "application/json")
+
+        return req
+
+    def _execute_mutation(
+        self, path: str, payload: dict, method: str
+    ) -> Union[dict, bool]:
+        """Generic execution for POST/PUT requests."""
+        req = self._build_request(path, payload=payload, method=method)
+        try:
+            with urllib.request.urlopen(req) as response:
+                body = response.read().decode()
+                if body:
+                    return json.loads(body)
+                return True
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode()
+            print(f"API Error ({e.code}): {err_body}")
+            return False
+        except Exception as e:
+            print(f"Network Error: {e}")
+            return False
+
+    def post(self, path: str, payload: dict) -> Union[dict, bool]:
+        """Generic POST."""
+        return self._execute_mutation(path, payload, "POST")
+
+    def put(self, path: str, payload: dict) -> Union[dict, bool]:
+        """Generic PUT."""
+        return self._execute_mutation(path, payload, "PUT")
+
+    def search_issues(self, payload: dict) -> dict:
+        """Executes the search POST request."""
+        req = self._build_request(
+            "/rest/api/3/search/jql", payload=payload, method="POST"
+        )
+        try:
+            with urllib.request.urlopen(req) as r:
+                return json.loads(r.read().decode())
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode()
+            raise RuntimeError(f"Jira API Error ({e.code}): {err_body}")
+
+    def fetch_transitions(self, issue_key: str) -> list:
+        """GET transitions for a specific issue."""
+        req = self._build_request(f"/rest/api/3/issue/{issue_key}/transitions")
+        try:
+            with urllib.request.urlopen(req) as r:
+                return json.loads(r.read().decode()).get("transitions", [])
+        except Exception:
+            return []
+
+    def fetch_myself(self) -> dict:
+        """GET current user info."""
+        req = self._build_request("/rest/api/3/myself")
         with urllib.request.urlopen(req) as r:
             return json.loads(r.read().decode())
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode()
-        raise RuntimeError(f"Jira API Error ({e.code}): {err_body}")
 
-
-def fetch_transitions(server, token, issue_key):
-    """Impure: GET transitions."""
-    url = f"{server}/rest/api/3/issue/{issue_key}/transitions"
-    req = urllib.request.Request(url)
-    req.add_header("Authorization", f"Basic {token}")
-    try:
-        with urllib.request.urlopen(req) as r:
-            return json.loads(r.read().decode()).get("transitions", [])
-    except Exception:
-        return []
-
-
-def fetch_myself_api(server, token):
-    """Impure: GET current user info (raw API call)."""
-    url = f"{server}/rest/api/3/myself"
-    req = urllib.request.Request(url)
-    req.add_header("Authorization", f"Basic {token}")
-    with urllib.request.urlopen(req) as r:
-        return json.loads(r.read().decode())
-
-
-def update_issue(server, token, endpoint, payload, method="POST"):
-    """Impure: POST/PUT for transitions, creations, or assignments."""
-    url = f"{server}/rest/api/3/{endpoint}"
-    req = urllib.request.Request(url, data=json.dumps(payload).encode(), method=method)
-    req.add_header("Authorization", f"Basic {token}")
-    req.add_header("Content-Type", "application/json")
-    try:
-        with urllib.request.urlopen(req) as response:
-            body = response.read().decode()
-            if body:
-                return json.loads(body)
-            return True
-    except Exception as e:
-        print(f"API Error: {e}")
-        return False
-
-
-def fetch_active_sprint(server, token, board_id):
-    """Impure: GET active sprint for a board via Agile API."""
-    url = f"{server}/rest/agile/1.0/board/{board_id}/sprint?state=active"
-    req = urllib.request.Request(url)
-    req.add_header("Authorization", f"Basic {token}")
-    try:
-        with urllib.request.urlopen(req) as r:
-            data = json.loads(r.read().decode())
-            values = data.get("values", [])
-            if values:
-                return values[0].get("id")
-    except Exception as e:
-        print(f"Sprint Fetch Error: {e}")
-    return None
-
-
-def add_to_sprint(server, token, sprint_id, issue_key):
-    """Impure: POST issue to sprint via Agile API."""
-    url = f"{server}/rest/agile/1.0/sprint/{sprint_id}/issue"
-    payload = {"issues": [issue_key]}
-    req = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST")
-    req.add_header("Authorization", f"Basic {token}")
-    req.add_header("Content-Type", "application/json")
-    try:
-        urllib.request.urlopen(req)
-        return True
-    except Exception as e:
-        print(f"Sprint Add Error: {e}")
-        return False
+    def fetch_active_sprint(self, board_id: str) -> Optional[str]:
+        """GET active sprint for a board via Agile API."""
+        req = self._build_request(
+            f"/rest/agile/1.0/board/{board_id}/sprint?state=active"
+        )
+        try:
+            with urllib.request.urlopen(req) as r:
+                data = json.loads(r.read().decode())
+                values = data.get("values", [])
+                if values:
+                    return values[0].get("id")
+        except Exception as e:
+            print(f"Sprint Fetch Error: {e}")
+        return None

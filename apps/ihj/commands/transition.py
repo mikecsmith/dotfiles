@@ -1,22 +1,44 @@
-from jira.client import fetch_transitions, update_issue
-from jira.payloads import build_transition_payload, filter_transitions
-from tui.formatters import clean_issue_key
+import sys
 from tui.terminal import prompt_numeric_menu, notify_user
+from jira.payloads import filter_transitions
+from jira.workflows import perform_transition
 
 
-def execute_transition(args, server, token, cfg):
-    # args: [slug, key]
-    slug, raw_key = args[-2], args[-1]
-    clean_key = clean_issue_key(raw_key)
-    allowed = cfg.get("boards", {}).get(slug, {}).get("transitions", [])
+def execute_transition(issue_key, client, cfg, use_toast):
+    if not issue_key:
+        return
 
-    raw_transitions = fetch_transitions(server, token, clean_key)
-    filtered = filter_transitions(raw_transitions, allowed)
+    # Find the board this issue belongs to by looking at the prefix
+    project_prefix = issue_key.split("-")[0].upper()
+    board_slug = next(
+        (
+            slug
+            for slug, b in cfg.get("boards", {}).items()
+            if b.get("project_key", "").upper() == project_prefix
+        ),
+        None,
+    )
+
+    allowed_transitions = (
+        cfg.get("boards", {}).get(board_slug, {}).get("transitions", [])
+        if board_slug
+        else []
+    )
+
+    raw_transitions = client.fetch_transitions(issue_key)
+    filtered = filter_transitions(raw_transitions, allowed_transitions)
     names = [t["name"] for t in filtered]
 
-    choice_idx = prompt_numeric_menu(names, f"󰡃 TRANSITION: {clean_key}")
+    if not names:
+        notify_user(f"No available transitions for {issue_key}", "Error", use_toast)
+        sys.exit(1)
+
+    choice_idx = prompt_numeric_menu(names, f"󰡃 TRANSITION: {issue_key}")
     if choice_idx is not None:
-        payload = build_transition_payload(filtered[choice_idx]["id"])
-        success = update_issue(server, token, f"issue/{clean_key}/transitions", payload)
-        if success:
-            notify_user(f"Moved to {names[choice_idx]}", clean_key, use_toast=True)
+        tid = filtered[choice_idx]["id"]
+        target_status = names[choice_idx]
+
+        if perform_transition(client, issue_key, tid):
+            notify_user(f"Moved to {target_status}", issue_key, use_toast=True)
+        else:
+            notify_user(f"Failed to move {issue_key}", "Error", use_toast=True)
