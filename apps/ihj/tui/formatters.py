@@ -55,7 +55,7 @@ def wrap_text(text, width):
 
 
 def adf_to_ansi(node, wrap_width=90):
-    """Converts ADF into ANSI formatted text."""
+    """Converts ADF into ANSI formatted text, preserving exact spacing."""
     if not node or not isinstance(node, dict):
         return ""
     nt, content = node.get("type"), node.get("content", [])
@@ -66,13 +66,9 @@ def adf_to_ansi(node, wrap_width=90):
             res += adf_to_ansi(c, wrap_width)
 
     elif nt == "paragraph":
-        parts = [
-            adf_to_ansi(c, wrap_width).strip()
-            for c in content
-            if adf_to_ansi(c, wrap_width).strip()
-        ]
-        if parts:
-            res = wrap_text(" ".join(parts), wrap_width) + "\n\n"
+        raw_text = "".join([adf_to_ansi(c, wrap_width) for c in content])
+        if raw_text.strip():
+            res = wrap_text(raw_text, wrap_width) + "\n\n"
 
     elif nt == "text":
         t = node.get("text", "")
@@ -83,7 +79,7 @@ def adf_to_ansi(node, wrap_width=90):
             elif mt == "em":
                 t = f"{C['italic']}{t}{C['reset']}"
             elif mt == "code":
-                t = f"{C['bg_gray']}{C['cyan']} {t} {C['reset']}"
+                t = f"{C['bg_gray']}{C['cyan']}{t}{C['reset']}"
             elif mt == "strike":
                 t = f"{C['dim']}~{t}~{C['reset']}"
             elif mt == "link":
@@ -109,7 +105,6 @@ def adf_to_ansi(node, wrap_width=90):
         lang = node.get("attrs", {}).get("language", "code").upper()
         code_text = "".join([c.get("text", "") for c in content])
 
-        # Build a beautiful, un-wrapped terminal code block
         block = f"\n{C['bg_gray']}{C['bold']}   {lang} {C['reset']}\n"
         for line in code_text.split("\n"):
             line = line.replace("\t", "    ")
