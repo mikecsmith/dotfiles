@@ -22,12 +22,10 @@ def execute_list(slug, mode, cache_dir, client, cfg):
     registry = build_issue_registry(raw_issues, term_w)
     lines, previews = build_fzf_preview(registry, cfg["type_order_map"], term_w)
 
-    # We must update the preview cache so FZF's right-pane updates on reload
     preview_path = os.path.join(cache_dir, f"{slug}_previews.json")
     with open(preview_path, "w") as f:
         json.dump(previews, f)
 
-    # Print the header and lines cleanly to stdout
     header = f"{C['bold']}{'ID':<12} P {'TYPE':<10} {'STATUS':<16} {'ASSIGNEE':<16} SUMMARY{C['reset']}"
     print(header)
     for line in lines:
