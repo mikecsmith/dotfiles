@@ -12,11 +12,9 @@ def adf_to_markdown(node):
         for c in content:
             res += adf_to_markdown(c)
     elif nt == "paragraph":
-        parts = [
-            adf_to_markdown(c).strip() for c in content if adf_to_markdown(c).strip()
-        ]
-        if parts:
-            res = " ".join(parts) + "\n\n"
+        raw_text = "".join([adf_to_markdown(c) for c in content])
+        if raw_text.strip():
+            res = raw_text + "\n\n"
     elif nt == "text":
         t = node.get("text", "")
         link_href = None
