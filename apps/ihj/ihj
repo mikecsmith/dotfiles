@@ -1,105 +1,33 @@
 #!/usr/bin/env python3
-# vim: set filetype=python :
 import os
 import sys
-import re
-import json
-import time
+import webbrowser
 from pathlib import Path
+
 
 from config.io import load_raw_config_file
 from config.processor import validate_config, parse_config
-
-from jira.jql_builder import build_jql
-from jira.payloads import (
-    build_search_payload,
-    parse_search_response,
-    build_transition_payload,
-    build_assignment_payload,
-    filter_transitions,
-)
+from tui.formatters import clean_issue_key
 
 from commands.upsert import execute_upsert
 from commands.comment import execute_comment
-
-from jira.client import search_jira, fetch_transitions, fetch_myself_api, update_issue
-from jira.hierarchy import build_export_hierarchy
-from jira.persistence import save_export_state, write_export_output, build_metadata
-
-from tui.view_builders import build_issue_registry, build_fzf_preview
-from tui.terminal import (
-    get_terminal_width,
-    prompt_numeric_menu,
-    launch_fzf,
-    notify_user,
-    copy_to_clipboard,
-)
-from tui.formatters import clean_issue_key
-
-from constants import C
+from commands.assign import execute_assign
+from commands.branch import execute_branch
+from commands.transition import execute_transition
+from commands.list import execute_list
+from commands.export import execute_export
 
 CONFIG_DIR = os.path.expanduser("~/.config/ihj")
 CACHE_DIR = os.path.expanduser("~/.local/state/ihj")
 EXECUTABLE = sys.argv[0]
-Path(CONFIG_DIR).mkdir(parents=True, exist_ok=True)
-Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
-
-
-def get_board_data(server, token, board_cfg, mode, custom_fields, force_refresh=False):
-    """Orchestrates Cache vs Network."""
-    slug = board_cfg.get("slug")
-    cache_file = os.path.join(CACHE_DIR, f"{slug}_{mode}.json")
-
-    if not force_refresh and os.path.exists(cache_file):
-        age = int(time.time() - os.path.getmtime(cache_file))
-        if age < 900:  # 15 minutes
-            with open(cache_file, "r") as f:
-                return json.load(f), age
-
-    jql = build_jql(board_cfg, mode, custom_fields)
-
-    all_issues = []
-    next_token = None
-    while True:
-        payload = build_search_payload(jql, custom_fields, next_token)
-        raw_response = search_jira(server, token, payload)
-        issues, next_token, is_last = parse_search_response(raw_response)
-        all_issues.extend(issues)
-        if is_last:
-            break
-
-    with open(cache_file, "w") as f:
-        json.dump(all_issues, f)
-
-    return all_issues, 0
-
-
-def get_my_account_id(server, token):
-    """Handles 1-week caching for the user's account ID."""
-    cache_file = os.path.join(CACHE_DIR, "myself.json")
-    if (
-        os.path.exists(cache_file)
-        and int(time.time() - os.path.getmtime(cache_file)) < 604800
-    ):
-        with open(cache_file, "r") as f:
-            return json.load(f).get("accountId")
-
-    data = fetch_myself_api(server, token)
-    if data and "accountId" in data:
-        with open(cache_file, "w") as f:
-            json.dump(data, f)
-        return data["accountId"]
-    return None
 
 
 def main():
-    os.makedirs(CONFIG_DIR, exist_ok=True)
-    os.makedirs(CACHE_DIR, exist_ok=True)
+    Path(CONFIG_DIR).mkdir(parents=True, exist_ok=True)
+    Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
 
     try:
-        target_path = f"{CONFIG_DIR}/config.yaml"
-
-        raw_cfg = load_raw_config_file(target_path)
+        raw_cfg = load_raw_config_file(f"{CONFIG_DIR}/config.yaml")
         validate_config(raw_cfg)
         cfg = parse_config(raw_cfg)
     except Exception as e:
@@ -112,8 +40,9 @@ def main():
 
     args = sys.argv[1:]
     use_toast = "--toast" in args
-
     clean_args_bg = [a for a in args if a != "--toast"]
+
+    # --- Routing Logic ---
 
     if "--edit" in args or "--create" in args:
         execute_upsert(args, CACHE_DIR, server, token, cfg)
@@ -123,169 +52,28 @@ def main():
         execute_comment(args, server, token, cfg)
         sys.exit(0)
 
-    if "--open" in args:
-        clean_key = clean_issue_key(clean_args_bg[-1])
-        import webbrowser
-
-        webbrowser.open(f"{server}/browse/{clean_key}")
-        sys.exit(0)
-
     if "--assign" in args:
-        clean_key = clean_issue_key(clean_args_bg[-1])
-        account_id = get_my_account_id(server, token)
-        if account_id:
-            payload = build_assignment_payload(account_id)
-            success = update_issue(
-                server, token, f"issue/{clean_key}/assignee", payload, method="PUT"
-            )
-            if success:
-                notify_user(
-                    "Assigned to you.", f"{clean_key} Updated", use_toast=use_toast
-                )
-            else:
-                notify_user(
-                    "Failed to assign.", f"{clean_key} Error", use_toast=use_toast
-                )
+        execute_assign(clean_args_bg, CACHE_DIR, server, token, use_toast)
         sys.exit(0)
 
     if "--branch" in args:
-        slug, mode, raw_key = clean_args_bg[-3], clean_args_bg[-2], clean_args_bg[-1]
-        clean_key = clean_issue_key(raw_key)
-        cache_file = os.path.join(CACHE_DIR, f"{slug}_{mode}.json")
-
-        if os.path.exists(cache_file):
-            with open(cache_file, "r") as f:
-                issues = json.load(f)
-
-            summary = next(
-                (
-                    i.get("fields", {}).get("summary")
-                    for i in issues
-                    if i.get("key") == clean_key
-                ),
-                None,
-            )
-            if not summary:
-                summary = next(
-                    (
-                        i.get("fields", {})
-                        .get("parent", {})
-                        .get("fields", {})
-                        .get("summary")
-                        for i in issues
-                        if i.get("fields", {}).get("parent", {}).get("key") == clean_key
-                    ),
-                    None,
-                )
-
-            if summary:
-                clean_summ = re.sub(r"[^a-z0-9]+", "-", summary.lower()).strip("-")
-                branch_cmd = f"git checkout -b {clean_key.lower()}-{clean_summ}"
-                copy_to_clipboard(branch_cmd)
-                notify_user(branch_cmd, "Branch Copied!", use_toast=use_toast)
-                sys.exit(0)
-
-        notify_user(
-            f"Could not find {clean_key} in cache.", "Branch Error", use_toast=use_toast
-        )
+        execute_branch(clean_args_bg, CACHE_DIR, use_toast)
         sys.exit(0)
 
     if "--transition" in args:
-        slug, raw_key = clean_args_bg[-2], clean_args_bg[-1]
-        clean_key = clean_issue_key(raw_key)
-        allowed = cfg.get("boards", {}).get(slug, {}).get("transitions", [])
-
-        raw_transitions = fetch_transitions(server, token, clean_key)
-        filtered = filter_transitions(raw_transitions, allowed)
-        names = [t["name"] for t in filtered]
-
-        choice_idx = prompt_numeric_menu(names, f"󰡃 TRANSITION: {clean_key}")
-        if choice_idx is not None:
-            payload = build_transition_payload(filtered[choice_idx]["id"])
-            update_issue(server, token, f"issue/{clean_key}/transitions", payload)
+        execute_transition(clean_args_bg, server, token, cfg)
         sys.exit(0)
 
-    if "--choose-mode" in args:
-        slug = clean_args_bg[-1]
-        modes = list(cfg["boards"][slug].get("modes", {}).keys())
-        choice_idx = prompt_numeric_menu(
-            modes, "JIRA MODE SELECTOR", color=C["magenta"]
-        )
-        if choice_idx is not None:
-            with open("/tmp/j_mode", "w") as f:
-                f.write(modes[choice_idx])
+    if "--open" in args:
+        clean_key = clean_issue_key(clean_args_bg[-1])
+        webbrowser.open(f"{server}/browse/{clean_key}")
         sys.exit(0)
 
-    is_export = "--export" in args
-    is_list = "--list" in args
-
-    clean_args = [a for a in args if a not in ["--export", "--list", "--toast"]]
-    slug = clean_args[0] if len(clean_args) > 0 else cfg.get("default_board", "ci")
-    mode = clean_args[1] if len(clean_args) > 1 else "active"
-
-    board_cfg = cfg["boards"].get(slug)
-    if not board_cfg:
-        sys.exit(f"Error: Board '{slug}' not found in config.")
-    board_cfg["slug"] = slug
-
-    if not any(
-        x in args
-        for x in [
-            "--branch",
-            "--assign",
-            "--transition",
-            "--choose-mode",
-            "--export",
-            "--edit",
-            "--create",
-            "--open",
-        ]
-    ):
-        with open("/tmp/j_mode", "w") as f:
-            f.write(mode)
-
-    raw_issues, age = get_board_data(
-        server,
-        token,
-        board_cfg,
-        mode,
-        cfg["formatted_custom_fields"],
-        force_refresh=is_export,
-    )
-
-    if is_export:
-        hierarchy, state_dict = build_export_hierarchy(raw_issues)
-        save_export_state(slug, state_dict)
-        meta = build_metadata(slug, board_cfg)
-        write_export_output({"metadata": meta, "issues": hierarchy})
+    if "--export" in args:
+        execute_export(clean_args_bg, server, token, cfg)
         sys.exit(0)
 
-    term_w = get_terminal_width()
-    registry = build_issue_registry(raw_issues, term_w)
-    lines, previews = build_fzf_preview(registry, cfg["type_order_map"], term_w)
-
-    preview_path = os.path.join(CACHE_DIR, f"{slug}_previews.json")
-    with open(preview_path, "w") as f:
-        json.dump(previews, f)
-
-    if is_list:
-        header = f"{C['bold']}{'ID':<12} P {'TYPE':<10} {'STATUS':<16} {'ASSIGNEE':<16} SUMMARY{C['reset']}"
-        print(header + "\n" + "\n".join(lines))
-        sys.exit(0)
-
-    bindings = {
-        "alt-r": f"reload(rm -f {CACHE_DIR}/{slug}_*.json && {EXECUTABLE} --list {slug} $(cat /tmp/j_mode))",
-        "alt-s": f"execute({EXECUTABLE} --choose-mode {slug})+reload({EXECUTABLE} --list {slug} $(cat /tmp/j_mode))",
-        "alt-a": f"execute-silent({EXECUTABLE} --assign {{1}} --toast)+reload(rm -f {CACHE_DIR}/{slug}_*.json && {EXECUTABLE} --list {slug} $(cat /tmp/j_mode))",
-        "alt-t": f"execute({EXECUTABLE} --transition {slug} {{1}})+reload(rm -f {CACHE_DIR}/{slug}_*.json && {EXECUTABLE} --list {slug} $(cat /tmp/j_mode))",
-        "alt-o": f"execute-silent({EXECUTABLE} --open {{1}})",
-        "alt-e": f"execute({EXECUTABLE} --edit -b {slug} {{1}} --toast)+reload(rm -f {CACHE_DIR}/{slug}_*.json && {EXECUTABLE} --list {slug} $(cat /tmp/j_mode))",
-        "alt-c": f"execute({EXECUTABLE} --comment {{1}} --toast)+reload(rm -f {CACHE_DIR}/{slug}_*.json && {EXECUTABLE} --list {slug} $(cat /tmp/j_mode))",
-        "alt-n": f"execute-silent({EXECUTABLE} --branch {slug} $(cat /tmp/j_mode) {{1}} --toast)",
-        "ctrl-n": f"execute({EXECUTABLE} --create -b {slug} --toast)+reload(rm -f {CACHE_DIR}/{slug}_*.json && {EXECUTABLE} --list {slug} $(cat /tmp/j_mode))",
-    }
-
-    launch_fzf(lines, board_cfg.get("name", slug), mode, age, preview_path, bindings)
+    execute_list(args, CACHE_DIR, EXECUTABLE, server, token, cfg)
 
 
 if __name__ == "__main__":
