@@ -84,7 +84,13 @@ def adf_to_ansi(node, wrap_width=90):
                 t = f"{C['dim']}~{t}~{C['reset']}"
             elif mt == "link":
                 href = m.get("attrs", {}).get("href", "")
-                t = f"{C['blue']}\033[4m{t}\033[24m{C['reset']} {C['dim']}({href}){C['reset']}"
+
+                # OSC 8 Clickable Terminal Link
+                link_start = f"\033]8;;{href}\a"
+                link_text = f"{C['blue']}\033[4m{t}\033[24m{C['reset']}"
+                link_end = "\033]8;;\a"
+
+                t = f"{link_start}{link_text}{link_end}"
         res = t
 
     elif nt == "heading":
