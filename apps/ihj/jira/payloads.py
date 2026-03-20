@@ -78,24 +78,28 @@ def build_upsert_payload(
         "description": adf_description,
     }
 
-    issue_type = frontmatter_dict.get("type")
-    if issue_type:
-        type_id = next((t["id"] for t in config_types if t["name"] == issue_type), None)
-        if type_id:
-            fields["issuetype"] = {"id": str(type_id)}
+    issue_type_name = frontmatter_dict.get("type")
+    type_cfg = next((t for t in config_types if t["name"] == issue_type_name), {})
+    type_id = type_cfg.get("id")
+    if type_id:
+        fields["issuetype"] = {"id": str(type_id)}
+
+    is_subtask = issue_type_name.lower() == "sub-task"
+
+    parent_key = frontmatter_dict.get("parent")
+    if parent_key:
+        fields["parent"] = {"key": parent_key.upper()}
 
     priority = frontmatter_dict.get("priority")
     if priority:
         fields["priority"] = {"name": priority}
 
-    parent = frontmatter_dict.get("parent")
-    if parent:
-        fields["parent"] = {"key": parent.upper()}
-
-    # Dynamically inject custom fields
     for cf_name, cf_id in custom_fields_map.items():
         val = frontmatter_dict.get(cf_name)
         if val is not None and val != "":
+            if cf_name == "team" and is_subtask:
+                continue
+
             if cf_name == "team" and val is True and team_uuid:
                 fields[f"customfield_{cf_id}"] = str(team_uuid)
             elif cf_name != "team":

@@ -12,7 +12,6 @@ def build_issue_registry(raw_issues, terminal_width):
     """Organizes flat API issues into a dictionary with ANSI-formatted strings."""
     wrap_width = min(90, terminal_width - 6)
 
-    # Safe, fixed-width divider to prevent FZF from triggering wrap artifacts (↳)
     divider = f"{C['dim']}{'─' * 64}{C['reset']}"
 
     registry = {}
@@ -23,7 +22,6 @@ def build_issue_registry(raw_issues, terminal_width):
         assignee = f.get("assignee")
         clist = f.get("comment", {}).get("comments", [])
 
-        # Format Comments
         comments_ansi = ""
         if clist:
             comments_ansi = f"\n\n{divider}\n\n{C['yellow']}{C['bold']}󱠁 LATEST COMMENTS{C['reset']}\n\n"
@@ -37,7 +35,6 @@ def build_issue_registry(raw_issues, terminal_width):
         if not desc:
             desc = f"{C['dim']}{C['italic']}No description provided.{C['reset']}"
 
-        # Extract rich metadata
         reporter = (
             f.get("reporter", {}).get("displayName", "Unassigned")
             if f.get("reporter")
@@ -77,10 +74,8 @@ def build_fzf_preview(registry, type_order_map, terminal_width, team_name="TEAM"
     known_children = {k for k, v in registry.items() if v["parent_key"]}
     SUMM_W = terminal_width - 65
 
-    # Safe, fixed-width divider to prevent FZF wrap arrows
     divider = f"{C['dim']}{'─' * 64}{C['reset']}"
 
-    # Nest the children
     for key, issue in registry.items():
         pk = issue["parent_key"]
         if pk and pk in registry:
@@ -101,10 +96,6 @@ def build_fzf_preview(registry, type_order_map, terminal_width, team_name="TEAM"
                 str(n.get("type_id")), (100, C["reset"], False)
             )[1]
 
-            # ==========================================
-            # 1. BUILD PREVIEW BLOCK
-            # ==========================================
-
             bc = f" {C['dim']}❯{C['reset']} "
             ident_line = (
                 f"{C['magenta']} {team_name.upper()}{C['reset']}{bc}"
@@ -114,7 +105,6 @@ def build_fzf_preview(registry, type_order_map, terminal_width, team_name="TEAM"
                 f"{get_priority_icon(n['priority'])} {n['priority'].upper()}"
             )
 
-            # Helper to pad values so the 2-column grid aligns perfectly
             def pad(text, width=22):
                 return (
                     text[: width - 3] + "..."
@@ -125,16 +115,11 @@ def build_fzf_preview(registry, type_order_map, terminal_width, team_name="TEAM"
             u_val = pad(n["user"])
             r_val = pad(n["reporter"])
 
-            # ---------------------------------------------------------
-            # The Dashboard Grid (Left Prefix Width is exactly 14 chars)
-            # ---------------------------------------------------------
             row1 = f"{C['cyan']} Assignee:   {C['reset']}{u_val} {C['dim']} Created: {C['reset']}{n['created']}"
             row2 = f"{C['dim']} Reporter:   {C['reset']}{r_val} {C['dim']} Updated: {C['reset']}{n['updated']}"
 
-            # Stack the header lines tightly
             header_lines = [ident_line, row1, row2]
 
-            # Full-width lines for lists
             if n["components"]:
                 header_lines.append(
                     f"{C['blue']} Components: {C['reset']}{n['components']}"
@@ -144,15 +129,12 @@ def build_fzf_preview(registry, type_order_map, terminal_width, team_name="TEAM"
                     f"{C['magenta']} Labels:     {C['reset']}{n['labels']}"
                 )
 
-            # Assemble the Dashboard Header (NO extra linebreaks)
             header_block = "\n".join(header_lines)
 
-            # Cap the metadata with the divider and print the Summary as an UPPERCASE H1 Header
             header_block += (
                 f"\n{divider}\n{C['bold']}{n['summary'].upper()}{C['reset']}\n\n"
             )
 
-            # --- Child Issues Section ---
             children_ansi = ""
             if n["children"]:
                 children_ansi = f"\n\n{divider}\n\n{C['blue']}{C['bold']}󰙔 CHILD ISSUES{C['reset']}\n\n"
@@ -175,14 +157,9 @@ def build_fzf_preview(registry, type_order_map, terminal_width, team_name="TEAM"
                         f"{c['summary']}\n"
                     )
 
-            # Assemble Final Preview
             previews[n["key"]] = (
                 f"{header_block}{n['description']}{children_ansi}{n['comments']}"
             )
-
-            # ==========================================
-            # 2. BUILD MAIN TUI LINE
-            # ==========================================
 
             indent = "  " * depth
             pref = "└─ " if depth > 0 else " "

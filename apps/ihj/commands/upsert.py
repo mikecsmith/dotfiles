@@ -32,7 +32,6 @@ def execute_upsert(args, cache_dir, client, cfg, use_toast, is_edit=False):
     orig_status = ""
     issue_key = None
 
-    # --- 1. DATA GATHERING (Fetch vs Template) ---
     if is_edit:
         issue_key_raw = getattr(args, "issue_key", None)
         if not issue_key_raw:
@@ -109,65 +108,123 @@ def execute_upsert(args, cache_dir, client, cfg, use_toast, is_edit=False):
 
         body_text = type_cfg.get("template", "").strip()
 
-    # --- 2. EDITOR LIFECYCLE ---
     initial_doc = build_frontmatter_doc(schema_path, metadata, body_text)
-
     target_line, search_pattern = calculate_cursor_target(
         initial_doc, metadata.get("summary")
     )
-    raw_modified = open_in_editor(
+
+    edited_file_contents = open_in_editor(
         editor_cmd, initial_doc, target_line=target_line, search_pattern=search_pattern
     )
 
-    if raw_modified.strip() == initial_doc.strip():
+    if edited_file_contents.strip() == initial_doc.strip():
         if is_dry_run:
-            print_dry_run("ABORTED", message="No changes detected.")
+            print_dry_run(
+                "ABORTED", message="No changes detected - assuming you wanted to abort."
+            )
         else:
-            notify_user("No changes made.", "Skipped", use_toast)
+            notify_user(
+                "No changes detected - assuming you wanted to abort.",
+                "Aborted",
+                use_toast,
+            )
         sys.exit(0)
 
-    # --- 3. PARSING & VALIDATION ---
-    yaml_str, md_body = split_frontmatter_and_body(raw_modified)
-    fm = parse_yaml_string(yaml_str)
-
-    if not fm or not fm.get("summary"):
-        notify_user("Aborted: Summary is required.", "Error", use_toast)
-        sys.exit(1)
-
-    adf_body = markdown_to_adf(md_body)
-
-    # --- 4. EXECUTE UPSERT (PUT vs POST) ---
-    upsert_payload = build_upsert_payload(
-        fm,
-        adf_body,
-        cfg["types"],
-        cfg["custom_fields"],
-        project_key=board_cfg.get("project_key"),
-        team_uuid=board_cfg.get("team_uuid"),
-    )
-
     target_key = issue_key
-    if is_dry_run:
-        target_key = target_key or "DRYRUN-999"
-        print_dry_run(f"UPSERT PAYLOAD ({target_key})", data=upsert_payload)
-    else:
-        if is_edit:
-            if not client.put(f"/rest/api/3/issue/{issue_key}", upsert_payload):
-                notify_user(f"Failed to update {issue_key}", "Error", use_toast)
-                sys.exit(1)
-            notify_user(f"Successfully updated {issue_key}", "Jira Edit", use_toast)
-        else:
-            response = client.post("/rest/api/3/issue", upsert_payload)
-            if response and isinstance(response, dict) and "key" in response:
-                target_key = str(response["key"])
+
+    while True:
+        yaml_str, md_body = split_frontmatter_and_body(edited_file_contents)
+        fm = parse_yaml_string(yaml_str)
+        adf_body = markdown_to_adf(md_body)
+
+        error_msg = None
+
+        if not fm or not fm.get("summary"):
+            error_msg = "Validation Error: Summary is required."
+        elif fm.get("type", "").lower() == "sub-task" and not fm.get("parent"):
+            error_msg = "Validation Error: Sub-tasks require a parent issue key."
+
+        if not error_msg:
+            upsert_payload = build_upsert_payload(
+                fm,
+                adf_body,
+                cfg["types"],
+                cfg["custom_fields"],
+                project_key=board_cfg.get("project_key"),
+                team_uuid=board_cfg.get("team_uuid"),
+            )
+
+            if is_dry_run:
+                target_key = target_key or "DRYRUN-999"
+                print_dry_run(f"UPSERT PAYLOAD ({target_key})", data=upsert_payload)
+                break
+
+            response = (
+                client.put(f"/rest/api/3/issue/{issue_key}", upsert_payload)
+                if is_edit
+                else client.post("/rest/api/3/issue", upsert_payload)
+            )
+
+            if response:
+                if isinstance(response, dict) and "key" in response:
+                    target_key = str(response["key"])
+
                 notify_user(
-                    f"Successfully created {target_key}", "Jira Create", use_toast
+                    f"Successfully {'updated' if is_edit else 'created'} {target_key}",
+                    "Jira Success",
+                    use_toast,
                 )
+                break
             else:
-                notify_user("Failed to create issue", "Error", use_toast)
+                error_msg = "JIRA API REJECTED THE PAYLOAD."
+
+        if error_msg:
+            from tui.terminal import copy_to_clipboard
+
+            issue_target = target_key if target_key else "New Issue"
+            summary_preview = fm.get("summary", "No summary provided")
+            if len(summary_preview) > 60:
+                summary_preview = summary_preview[:57] + "..."
+
+            context_subtitle = (
+                f"{C['red']}✖ {error_msg}{C['reset']}\n"
+                f"{C['dim']}─{'─' * 60}{C['reset']}\n"
+                f"{C['bold']}Target:{C['reset']}  {issue_target}\n"
+                f"{C['bold']}Type:{C['reset']}    {fm.get('type', 'Unknown')}\n"
+                f"{C['bold']}Summary:{C['reset']} {summary_preview}"
+            )
+
+            options = [
+                "Re-edit (Fix errors)",
+                "Copy contents to clipboard",
+                "Abort and lose changes",
+            ]
+
+            choice = prompt_numeric_menu(
+                options,
+                "⚠️  UPSERT FAILED: WHAT NOW?",
+                color=C["red"],
+                subtitle=context_subtitle,
+            )
+
+            if choice == 0:
+                edited_file_contents = open_in_editor(
+                    editor_cmd,
+                    edited_file_contents,
+                    target_line=target_line,
+                    search_pattern=search_pattern,
+                )
+                continue
+
+            if choice == 1:
+                copy_to_clipboard(edited_file_contents)
+                notify_user("Buffer copied to clipboard.", "Rescue", use_toast)
                 sys.exit(1)
 
-    # --- 5. POST-UPSERT ACTIONS ---
+            if choice == 2 or choice is None:  # Abort
+                notify_user("Changes abandoned.", "Aborted", use_toast)
+                sys.exit(1)
+
     if fm.get("sprint"):
         if is_dry_run:
             print_dry_run(
