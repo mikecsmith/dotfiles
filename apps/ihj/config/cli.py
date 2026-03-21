@@ -34,19 +34,26 @@ def parse_args():
         "tui", parents=[global_parser], help="Launch the interactive FZF UI (Default)"
     )
     tui_p.add_argument("board", nargs="?", help="Target board slug")
-    tui_p.add_argument("mode", nargs="?", help="Target mode")
+    tui_p.add_argument("filter", nargs="?", help="Target filter")
 
     list_p = subparsers.add_parser(
         "list", parents=[global_parser], help="Print issues to stdout"
     )
     list_p.add_argument("board", nargs="?", help="Target board slug")
-    list_p.add_argument("mode", nargs="?", help="Target mode")
+    list_p.add_argument("filter", nargs="?", help="Target filter")
 
     export_p = subparsers.add_parser(
         "export", parents=[global_parser], help="Export issue hierarchy as JSON"
     )
     export_p.add_argument("board", nargs="?", help="Target board slug")
-    export_p.add_argument("mode", nargs="?", help="Target mode")
+    export_p.add_argument("filter", nargs="?", help="Target filter")
+
+    bootstrap_p = subparsers.add_parser(
+        "bootstrap", parents=[global_parser], help="Scaffold a board config from Jira"
+    )
+    bootstrap_p.add_argument(
+        "project_key", help="The Jira Project Key (e.g., INFRA, CIAM)"
+    )
 
     # --- 2. UPSERT ---
     create_p = subparsers.add_parser(
@@ -107,6 +114,15 @@ def parse_args():
     )
     open_p.add_argument("issue_key", type=clean_issue_key, help="The issue key")
 
-    # Scrub ANSI from raw sys.argv before passing to argparse
+    filter_p = subparsers.add_parser(
+        "filter", parents=[global_parser], help="Switch the active board filter"
+    )
+    filter_p.add_argument("board", help="Target board slug")
+
+    extract_p = subparsers.add_parser(
+        "extract", parents=[global_parser], help="Extract issue and relations for an LLM prompt"
+    )
+    extract_p.add_argument("issue_key", type=clean_issue_key, help="The issue key")
+
     clean_argv = [strip_ansi(arg) for arg in sys.argv[1:]]
     return parser.parse_args(clean_argv)

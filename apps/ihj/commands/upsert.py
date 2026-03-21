@@ -80,7 +80,7 @@ def execute_upsert(args, cache_dir, client, cfg, use_toast, is_edit=False):
         body_text = adf_to_markdown(fields.get("description")).strip()
 
     else:
-        types = [t["name"] for t in cfg.get("types", [])]
+        types = [t["name"] for t in board_cfg.get("types", [])]
         selected_type = getattr(args, "type", None)
         if not selected_type:
             choice_idx = prompt_numeric_menu(
@@ -91,7 +91,7 @@ def execute_upsert(args, cache_dir, client, cfg, use_toast, is_edit=False):
             selected_type = types[choice_idx]
 
         type_cfg = next(
-            (t for t in cfg.get("types", []) if t["name"] == selected_type), {}
+            (t for t in board_cfg.get("types", []) if t["name"] == selected_type), {}
         )
         orig_status = "Backlog"
 
@@ -148,7 +148,7 @@ def execute_upsert(args, cache_dir, client, cfg, use_toast, is_edit=False):
             upsert_payload = build_upsert_payload(
                 fm,
                 adf_body,
-                cfg["types"],
+                board_cfg["types"],
                 cfg["custom_fields"],
                 project_key=board_cfg.get("project_key"),
                 team_uuid=board_cfg.get("team_uuid"),

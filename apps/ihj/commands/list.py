@@ -20,7 +20,12 @@ def execute_list(slug, mode, cache_dir, client, cfg):
 
     term_w = get_terminal_width()
     registry = build_issue_registry(raw_issues, term_w)
-    lines, previews = build_fzf_preview(registry, cfg["type_order_map"], term_w)
+    lines, previews = build_fzf_preview(
+        registry, 
+        board_cfg["type_order_map"], 
+        term_w,
+        transitions=board_cfg.get("transitions", [])
+    )
 
     preview_path = os.path.join(cache_dir, f"{slug}_previews.json")
     with open(preview_path, "w") as f:

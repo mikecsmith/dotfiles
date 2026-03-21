@@ -1,6 +1,6 @@
 def generate_frontmatter_schema(cfg, board_cfg):
     """Generates the JSON Schema dictionary with conditional logic for Sub-tasks."""
-    types = [t["name"] for t in cfg.get("types", [])]
+    types = [t["name"] for t in board_cfg.get("types", [])]
     transitions = board_cfg.get("transitions", [])
 
     properties = {

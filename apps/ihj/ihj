@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
+import sys
 import webbrowser
 
-from config.bootstrap import initialize_app
+from config.init import initialize_app
 from jira.client import JiraClient
 
+from commands.bootstrap import execute_bootstrap
 from commands.upsert import execute_upsert
 from commands.comment import execute_comment
 from commands.assign import execute_assign
@@ -12,19 +14,18 @@ from commands.transition import execute_transition
 from commands.export import execute_export
 from commands.tui import execute_tui
 from commands.list import execute_list
+from commands.filter import execute_filter
+from commands.extract import execute_extract
 
 
 def main():
-    # 1. Gather all configuration, args, and environment context
     ctx = initialize_app()
 
     args = ctx["args"]
     cfg = ctx["cfg"]
 
-    # 2. Spin up the Domain Client
     client = JiraClient(cfg.get("server"), ctx["token"])
 
-    # 3. Route the command
     cmd = args.command or "tui"
 
     if cmd == "create":
@@ -57,20 +58,32 @@ def main():
     elif cmd == "open":
         webbrowser.open(f"{client.server}/browse/{args.issue_key}")
 
-    elif cmd == "export":
-        board = getattr(args, "board", None) or cfg.get("default_board", "ci")
-        mode = getattr(args, "mode", None) or "active"
-        execute_export(board, mode, client, cfg)
+    elif cmd == "bootstrap":
+        execute_bootstrap(args.project_key, client, cfg)
 
-    elif cmd == "list":
-        board = getattr(args, "board", None) or cfg.get("default_board", "ci")
-        mode = getattr(args, "mode", None) or "active"
-        execute_list(board, mode, ctx["cache_dir"], client, cfg)
+    elif cmd == "filter":
+        execute_filter(getattr(args, "board", None), cfg)
 
-    elif cmd == "tui":
-        board = getattr(args, "board", None) or cfg.get("default_board", "ci")
-        mode = getattr(args, "mode", None) or "active"
-        execute_tui(board, mode, ctx["cache_dir"], ctx["executable"], client, cfg)
+    elif cmd == "extract":
+        execute_extract(args.issue_key, ctx["cache_dir"], cfg, ctx["use_toast"])
+
+    elif cmd in ("tui", "list", "export"):
+        board_slug = getattr(args, "board", None) or cfg.get("default_board")
+        filter_name = getattr(args, "filter", None) or cfg.get("default_filter", "active")
+
+        if not board_slug:
+            sys.exit("\nError: No board specified and 'default_board' not set in config.")
+            
+        board_cfg = cfg.get("boards", {}).get(board_slug)
+        if not board_cfg:
+            sys.exit(f"\nError: Board '{board_slug}' not found in config.")
+
+        if cmd == "export":
+            execute_export(board_slug, filter_name, client, cfg)
+        elif cmd == "list":
+            execute_list(board_slug, filter_name, ctx["cache_dir"], client, cfg)
+        elif cmd == "tui":
+            execute_tui(board_slug, filter_name, ctx["cache_dir"], ctx["executable"], client, cfg)
 
 
 if __name__ == "__main__":

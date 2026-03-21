@@ -43,6 +43,26 @@ export JIRA_BEARER_TOKEN="your_token_here"
 
 ---
 
+## 🏗 Bootstrapping Your First Board
+
+Instead of writing YAML by hand, `ihj` includes a powerful wizard that auto-discovers your Jira instance's messy internal IDs, custom fields, and issue types.
+
+Simply run the bootstrap command with your target Jira Project Key (e.g., `INFRA`, `CIAM`), and pipe the output directly into your config file:
+
+```bash
+mkdir -p ~/.config/ihj
+ihj bootstrap FOO >> ~/.config/ihj/config.yaml
+```
+
+**What the Bootstrap Wizard Does:**
+
+1. **Board Selection:** Presents a clean numeric menu of all Agile boards linked to the project.
+2. **Smart JQL Interpolation:** Reverse-engineers the board's base filter, dynamically extracting complex variables (like your `team_uuid`) and replacing them with clean template tags.
+3. **Bulletproof Statuses:** Automatically maps your columns and builds an `active` mode that intelligently hides "Done" issues older than 2 weeks, regardless of how messy your Jira workflows are.
+4. **Project-Scoped Types:** Fetches only the Issue Types allowed in your specific project to prevent global ID clashes, automatically inferring parent/child relationships.
+
+---
+
 ## ⚙️ Configuration
 
 The CLI looks for its configuration file at `~/.config/ihj/config.yaml`.
@@ -50,7 +70,7 @@ The CLI looks for its configuration file at `~/.config/ihj/config.yaml`.
 ### Example Configuration
 
 ```yaml
-server: "[https://foo-company.atlassian.net](https://foo-company.atlassian.net)"
+server: "https://foo-company.atlassian.net"
 default_board: "foo"
 editor: "nvim"
 
@@ -66,62 +86,51 @@ boards:
   foo:
     id: 12345
     name: "Foo Engineering"
-    team_uuid: "e8b7c4a1-8d23-4b5c-9f6a-123456789abc"
     project_key: "FOO"
+    team_uuid: "e8b7c4a1-8d23-4b5c-9f6a-123456789abc"
     jql: 'project = "{project_key}" AND {team} = "{team_uuid}"'
     modes:
-      active: "(statusCategory != Done) OR (statusCategory = Done AND status changed TO Done AFTER -2w)"
+      active: 'status IN ("To Do", "In Progress", "Done") AND (statusCategory != Done OR (statusCategory = Done AND status CHANGED TO ("Done") AFTER -2w))'
       all: ""
-      me: "assignee = currentUser()"
-      backlog: "statusCategory = 'To Do'"
+      my: "assignee = currentUser() AND statusCategory != Done"
     transitions:
-      - "Backlog"
-      - "In Refinement"
+      - "To Do"
       - "In Progress"
-      - "In Review"
       - "Done"
+    types:
+      - id: 6
+        name: Epic
+        order: 20
+        color: magenta
+        has_children: true
+      - id: 7
+        name: Task
+        order: 30
+        color: default
+        has_children: true
+        template: |
+          ## Technical Task 
 
-types:
-  - id: 6
-    name: Epic
-    order: 1
-    color: magenta
-    has_children: true
-  - id: 7
-    name: Task
-    order: 2
-    color: default
-    has_children: true
-    template: |
-      ## Technical Task 
-
-      ## Acceptance Criteria
-      - Given [user], when [they do something], then [the following behaviour is required]
-  - id: 8
-    name: Story
-    order: 2
-    color: cyan
-    has_children: false
-    template: |
-      ## User Story
-      As a [user], I want [feature] so that [reason].
-
-      ## Acceptance Criteria
-      - [ ] Criterion 1
-  - id: 9
-    name: Sub-task
-    order: 3
-    color: white # light grey for me currently but it supposedly maps to white
-    has_children: false
+          ## Acceptance Criteria
+          - Given [user], when [they do something], then [the following behaviour is required]
+      - id: 8
+        name: Story
+        order: 30
+        color: cyan
+        has_children: false
+      - id: 9
+        name: Sub-task
+        order: 40
+        color: white
+        has_children: false
 ```
 
 ### Understanding the Config Blocks
 
-- **`custom_fields`:** Maps friendly names to Jira's internal integer IDs.
+- **`custom_fields`:** Maps friendly names to Jira's internal integer IDs globally.
   - **Required:** `team`, `epic_name`, and `epic_link` are mandatory for the CLI to function.
-  - **Arbitrary:** You can add any other custom fields (like `points`) to be used in your JQL filters or modes.
-- **`types`:** Defines the issue hierarchy and terminal rendering.
-  - `order`: Dictates the view hierarchy in the TUI (e.g., nesting Sub-tasks under Stories).
+- **`boards.<slug>.types`:** Defines the issue hierarchy and terminal rendering _specific to this board_.
+  - `order`: Dictates the view hierarchy in the TUI (e.g., nesting Sub-tasks under Stories). We recommend using spaced numbers (`10`, `20`, `30`) so you can easily inject new custom types later without renumbering everything.
   - `has_children`: Plays into validation rules (ensuring you can't assign a Sub-task as the parent of an Epic).
   - `color`: Dictates the syntax highlighting color used in the FZF list.
   - `template`: A multiline Markdown string used to pre-populate the editor body when creating a new issue of this type.
@@ -142,40 +151,43 @@ The `jql` string defined in your board config is **required** and acts as the fo
 > [!WARNING]
 > **Do not clobber top-level board keys!** When adding to `custom_fields`, ensure your keys do not share a name with a top-level `boards` key (e.g., do not create a custom field named `team_uuid`).
 
-TODO: Add a JSON schema for the `config.yaml` file.
-
 ### Modes
 
-Modes allow you to quickly toggle views within a board using `Alt-s` in the TUI. The keys defined under `modes` (e.g., `active`, `my`) populate the selection menu.
-
-When a mode is selected, its JQL is concatenated to the Base JQL using an `AND` operator:
-`Base JQL` + `AND` + `(Mode JQL)`
-
-_Example resulting JQL for the `my` mode:_
-`(project = "FOO" AND cf[15000] = "e8b7c4a1-8d23-4b5c-9f6a-123456789abc") AND (assignee = currentUser())`
+Modes allow you to quickly toggle views within a board using `Alt-s` in the TUI. The keys defined under `modes` (e.g., `active`, `my`) populate the selection menu. When a mode is selected, its JQL is concatenated to the Base JQL using an `AND` operator.
 
 ---
 
-## 🚀 CLI Usage & Dry Runs
+## 🚀 CLI Commands
 
-While `ihj` launches the interactive dashboard, the tool also features a fully-featured CLI for direct operations, complete with contextual help (`ihj <command> -h`).
+While `ihj` is built around its interactive dashboard, every action can be triggered directly from the command line. Run `ihj <command> -h` for specific argument flags.
 
-```bash
-# Launch the dashboard
-ihj tui foo active
+### Core Views & Setup
 
-# Safely test what an edit payload would look like without hitting the API
-ihj edit FOO-123 -s "Updated Summary" -S "In Progress" --dry-run
+- `ihj tui [board] [mode]` - Launches the interactive FZF dashboard (Default command).
+- `ihj bootstrap <project_key>` - Scaffolds a complete board configuration block to `stdout`.
+- `ihj list [board] [mode]` - Prints the ANSI-formatted issue list to `stdout` (Used internally by the TUI).
+- `ihj export [board] [mode]` - Exports the full nested issue hierarchy as a cleanly formatted JSON payload.
 
-# Direct issue creation
-ihj create -b foo -t Task -s "Fix the database schema" -p High
-```
+### Issue Editing & Creation
+
+- `ihj create -b <board>` - Opens your editor to draft a new issue.
+- `ihj edit <issue_key>` - Opens your editor to modify an existing issue's metadata and description.
+- `ihj comment <issue_key>` - Opens a blank buffer to instantly add a comment to an issue.
+
+_Tip: You can append `--dry-run` to `create`, `edit`, or `comment` to print the exact JSON payload the CLI generated without actually sending it to Jira._
+
+### Quick Actions
+
+- `ihj assign <issue_key>` - Silently assigns the issue to yourself.
+- `ihj transition <issue_key>` - Triggers a numeric menu of valid workflow transitions.
+- `ihj branch <issue_key>` - Generates a clean git branch name (e.g., `git checkout -b foo-123-fix-db`) and copies it to your clipboard.
+- `ihj open <issue_key>` - Opens the issue in your default web browser.
 
 ---
 
 ## 📝 Editor Integration
 
-When you create (`Ctrl-n`) or edit (`Alt-e`) an issue, `ihj` generates a temporary Markdown file with a YAML frontmatter block. If creating a new issue, the body of the markdown file will be pre-populated with the `template` defined for that issue type in your config.
+When you create (`Ctrl-n`) or edit (`Alt-e`) an issue, `ihj` generates a temporary Markdown file with a YAML frontmatter block.
 
 ### Workflow
 

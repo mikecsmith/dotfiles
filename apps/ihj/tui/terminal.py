@@ -61,29 +61,30 @@ def get_terminal_width():
 
 
 def prompt_numeric_menu(options, title, color=C["blue"], subtitle=None):
-    """Numeric TUI selector using standard input for multi-digit support."""
+    """Numeric TUI selector using standard error to safely support piping stdout."""
     try:
-        sys.stdout.write("\033[?1049h\033[2J\033[H")
-        sys.stdout.write(f"{C['bold']}{color} {title} {C['reset']}\n")
+        sys.stderr.write("\033[?1049h\033[2J\033[H")
+        sys.stderr.write(f"{C['bold']}{color} {title} {C['reset']}\n")
 
         if subtitle:
-            sys.stdout.write(f"\n{subtitle}\n")
+            sys.stderr.write(f"\n{subtitle}\n")
 
-        sys.stdout.write("\n")
+        sys.stderr.write("\n")
 
         for i, opt in enumerate(options):
-            sys.stdout.write(f"  [{i + 1}] {opt}\n")
+            sys.stderr.write(f"  [{i + 1}] {opt}\n")
 
-        sys.stdout.flush()
+        sys.stderr.flush()
 
         while True:
-            choice = (
-                input(
-                    f"\n{C['dim']}Choice (q to cancel, enter to confirm): {C['reset']}"
-                )
-                .strip()
-                .lower()
+            # Print the prompt to STDERR so it doesn't get captured in pipes
+            sys.stderr.write(
+                f"\n{C['dim']}Choice (q to cancel, enter to confirm): {C['reset']}"
             )
+            sys.stderr.flush()
+
+            # Read the user's input directly from STDIN
+            choice = sys.stdin.readline().strip().lower()
 
             if choice == "q":
                 return None
@@ -93,31 +94,21 @@ def prompt_numeric_menu(options, title, color=C["blue"], subtitle=None):
                 if 0 <= idx < len(options):
                     return idx
 
-            print(
-                f"{C['red']}Invalid choice. Please select 1-{len(options)}.{C['reset']}"
-            )
-
-            if choice == "q":
-                return None
-            if choice.isdigit():
-                idx = int(choice) - 1
-                if 0 <= idx < len(options):
-                    return idx
-            print(
-                f"{C['red']}Invalid choice. Please select 1-{len(options)}.{C['reset']}"
+            sys.stderr.write(
+                f"{C['red']}Invalid choice. Please select 1-{len(options)}.{C['reset']}\n"
             )
 
     except (KeyboardInterrupt, EOFError):
         return None
     finally:
-        sys.stdout.write("\033[?1049l")
-        sys.stdout.flush()
+        sys.stderr.write("\033[?1049l")
+        sys.stderr.flush()
 
 
 def launch_fzf(lines, board_name, mode_name, age, preview_path, bindings):
     """Executes the main FZF interface."""
     list_header = f"{C['bold']}{'ID':<12} P {'TYPE':<10} {'STATUS':<16} {'ASSIGNEE':<16} SUMMARY{C['reset']}"
-    help_guide = f"{C['cyan']}Alt-R{C['reset']} Refresh | {C['cyan']}Alt-S{C['reset']} Mode | {C['cyan']}Alt-A{C['reset']} Assign | {C['cyan']}Alt-T{C['reset']} Transition | {C['cyan']}Alt-O{C['reset']} Open | {C['cyan']}Alt-E{C['reset']} Edit | {C['cyan']}Alt-C{C['reset']} Comment | {C['cyan']}Alt-N{C['reset']} Branch | {C['cyan']}Ctrl-N{C['reset']} New"
+    help_guide = f"{C['cyan']}Alt-R{C['reset']} Refresh | {C['cyan']}Alt-F{C['reset']} Filter | {C['cyan']}Alt-A{C['reset']} Assign | {C['cyan']}Alt-T{C['reset']} Transition | {C['cyan']}Alt-O{C['reset']} Open | {C['cyan']}Alt-E{C['reset']} Edit | {C['cyan']}Alt-C{C['reset']} Comment | {C['cyan']}Alt-N{C['reset']} Branch | {C['cyan']}Ctrl-N{C['reset']} New"
 
     fzf_cmd = [
         "fzf",
