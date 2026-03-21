@@ -5,6 +5,7 @@ from tui.formatters import (
     get_status_style,
     format_date,
     format_datetime,
+    to_standard_title_case,
 )
 
 
@@ -68,7 +69,7 @@ def build_issue_registry(raw_issues, terminal_width):
 
 def build_fzf_preview(registry, type_order_map, terminal_width, team_name="TEAM"):
     """
-    Pure: Flattens the registry into FZF lines and rich preview blocks.
+    Flattens the registry into FZF lines and rich preview blocks.
     """
     lines, previews = [], {}
     known_children = {k for k, v in registry.items() if v["parent_key"]}
@@ -150,10 +151,12 @@ def build_fzf_preview(registry, type_order_map, terminal_width, team_name="TEAM"
                     c_type_color = type_order_map.get(
                         str(c.get("type_id")), (100, C["reset"], False)
                     )[1]
+
+                    c_clean_status = to_standard_title_case(c["status"])
                     children_ansi += (
                         f"  {C['dim']}↳{C['reset']} "
                         f"{c_type_color}{c['key']:<11}{C['reset']} "
-                        f"{c_st_color}{c_st_icon} {c['status'][:14]:<14}{C['reset']} "
+                        f"{c_st_color}{c_st_icon} {c_clean_status[:14]:<14}{C['reset']} "
                         f"{c['summary']}\n"
                     )
 
@@ -181,11 +184,13 @@ def build_fzf_preview(registry, type_order_map, terminal_width, team_name="TEAM"
             if child_count > 0:
                 display_summary = f"{C['bold']}{display_summary} {C['dim']}({child_count} sub){C['reset']}"
 
+            clean_type = to_standard_title_case(n["type"])
+            clean_status = to_standard_title_case(n["status"])
             lines.append(
                 f"{type_color}{n['key']:<12}{C['reset']} "
                 f"{get_priority_icon(n['priority'])} "
-                f"{type_color}{n['type'][:10]:<10}{C['reset']} "
-                f"{st_color}{n['status'][:16]:<16}{C['reset']} "
+                f"{type_color}{clean_type[:10]:<10}{C['reset']} "
+                f"{st_color}{clean_status[:16]:<16}{C['reset']} "
                 f"{C['dim']}{n['user'][:16]:<16}{C['reset']} "
                 f"{display_summary}"
             )

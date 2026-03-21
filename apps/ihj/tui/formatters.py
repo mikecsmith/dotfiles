@@ -162,3 +162,41 @@ def clean_issue_key(raw_string):
     """Strips ANSI escape sequences and standardizes the Jira issue key."""
     ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
     return ansi_escape.sub("", raw_string).strip().upper()
+
+
+def to_standard_title_case(text):
+    """Converts text to Title Case, ignoring minor words."""
+    if not text:
+        return ""
+
+    minor_words = {
+        "a",
+        "an",
+        "the",
+        "and",
+        "but",
+        "or",
+        "for",
+        "nor",
+        "on",
+        "at",
+        "to",
+        "from",
+        "by",
+        "in",
+        "of",
+    }
+
+    words = text.lower().split()
+    if not words:
+        return ""
+
+    result = [words[0].capitalize()]
+
+    for word in words[1:]:
+        if word in minor_words:
+            result.append(word)
+        else:
+            result.append(word.capitalize())
+
+    return " ".join(result)
