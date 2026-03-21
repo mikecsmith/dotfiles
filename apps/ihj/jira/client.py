@@ -92,3 +92,62 @@ class JiraClient:
         except Exception as e:
             print(f"Sprint Fetch Error: {e}")
         return None
+
+    def fetch_board_config(self, board_id: str) -> dict:
+        """GET Agile board configuration (columns and filter ID)."""
+        req = self._build_request(f"/rest/agile/1.0/board/{board_id}/configuration")
+        with urllib.request.urlopen(req) as r:
+            return json.loads(r.read().decode())
+
+    def fetch_filter(self, filter_id: str) -> dict:
+        """GET saved filter details (extracts base JQL)."""
+        req = self._build_request(f"/rest/api/3/filter/{filter_id}")
+        with urllib.request.urlopen(req) as r:
+            return json.loads(r.read().decode())
+
+    def fetch_fields(self) -> list:
+        """GET all fields (standard and custom) in the Jira instance."""
+        req = self._build_request("/rest/api/3/field")
+        try:
+            with urllib.request.urlopen(req) as r:
+                return json.loads(r.read().decode())
+        except Exception:
+            return []
+
+    def fetch_issuetypes(self) -> list:
+        """GET all issue types in the Jira instance."""
+        req = self._build_request("/rest/api/3/issuetype")
+        try:
+            with urllib.request.urlopen(req) as r:
+                return json.loads(r.read().decode())
+        except Exception:
+            return []
+
+    def fetch_statuses(self) -> list:
+        """GET all statuses to map IDs back to human-readable names."""
+        req = self._build_request("/rest/api/3/status")
+        try:
+            with urllib.request.urlopen(req, timeout=5) as r:
+                return json.loads(r.read().decode())
+        except Exception:
+            return []
+
+    def fetch_project(self, project_key: str) -> dict:
+        """GET a specific project to find its mapped issue types."""
+        req = self._build_request(f"/rest/api/3/project/{project_key}")
+        try:
+            with urllib.request.urlopen(req, timeout=5) as r:
+                return json.loads(r.read().decode())
+        except Exception:
+            return {}
+
+    def fetch_boards_for_project(self, project_key: str) -> list:
+        """GET all boards associated with a specific project key."""
+        # The Agile API allows filtering boards by projectKeyOrId
+        req = self._build_request(f"/rest/agile/1.0/board?projectKeyOrId={project_key}")
+        try:
+            with urllib.request.urlopen(req, timeout=5) as r:
+                data = json.loads(r.read().decode())
+                return data.get("values", [])
+        except Exception:
+            return []

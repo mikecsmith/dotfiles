@@ -66,16 +66,20 @@ def build_issue_registry(raw_issues, terminal_width):
         }
     return registry
 
-
-def build_fzf_preview(registry, type_order_map, terminal_width, team_name="TEAM"):
-    """
-    Flattens the registry into FZF lines and rich preview blocks.
-    """
+def build_fzf_preview(registry, type_order_map, terminal_width, team_name="TEAM", transitions=None):
     lines, previews = [], {}
-    known_children = {k for k, v in registry.items() if v["parent_key"]}
+    
+    known_children = {
+        k for k, v in registry.items() 
+        if v["parent_key"] and v["parent_key"] in registry
+    }
+    
     SUMM_W = terminal_width - 65
-
     divider = f"{C['dim']}{'─' * 64}{C['reset']}"
+
+    if transitions is None:
+        transitions = []
+    status_weights = {s.lower(): i for i, s in enumerate(transitions)}
 
     for key, issue in registry.items():
         pk = issue["parent_key"]
@@ -83,9 +87,11 @@ def build_fzf_preview(registry, type_order_map, terminal_width, team_name="TEAM"
             registry[pk]["children"][key] = issue
 
     def flatten(nodes, depth=0):
+        # --- NEW: Sort by Status Order first, then Type, then Key ---
         sorted_nodes = sorted(
             nodes,
             key=lambda x: (
+                status_weights.get((x.get("status") or "").lower(), 99),
                 type_order_map.get(str(x.get("type_id")), (100, "", False))[0],
                 x["key"],
             ),
@@ -142,6 +148,7 @@ def build_fzf_preview(registry, type_order_map, terminal_width, team_name="TEAM"
                 sorted_children = sorted(
                     n["children"].values(),
                     key=lambda x: (
+                        status_weights.get((x.get("status") or "").lower(), 99), # <--- ADD THIS
                         type_order_map.get(str(x.get("type_id")), (100, "", False))[0],
                         x["key"],
                     ),

@@ -53,7 +53,13 @@ def execute_tui(slug, mode, cache_dir, executable, client, cfg):
 
     term_w = get_terminal_width()
     registry = build_issue_registry(raw_issues, term_w)
-    lines, previews = build_fzf_preview(registry, cfg["type_order_map"], term_w)
+
+    lines, previews = build_fzf_preview(
+        registry, 
+        board_cfg["type_order_map"], 
+        term_w,
+        transitions=board_cfg.get("transitions", [])
+    )
 
     preview_path = os.path.join(cache_dir, f"{slug}_previews.json")
     with open(preview_path, "w") as f:
@@ -64,14 +70,14 @@ def execute_tui(slug, mode, cache_dir, executable, client, cfg):
 
     bindings = {
         "alt-r": reload_cmd,
-        "alt-s": f"execute({executable} mode {slug})+{reload_cmd}",
+        "alt-f": f"execute({executable} filter {slug})+{reload_cmd}",
         "alt-a": f"execute-silent({executable} assign {{1}})+{reload_cmd}",
-        # Notice how the closing parenthesis is NOW at the end of the execute block:
         "alt-t": f"execute({executable} transition {{1}} {pause_on_err})+{reload_cmd}",
         "alt-o": f"execute-silent({executable} open {{1}})",
         "alt-e": f"execute({executable} edit {{1}} -b {slug} {pause_on_err})+{reload_cmd}",
         "alt-c": f"execute({executable} comment {{1}} {pause_on_err})+{reload_cmd}",
         "alt-n": f"execute-silent({executable} branch {{1}} -b {slug})",
+        "alt-x": f"execute({executable} extract {{1}} {pause_on_err})",
         "ctrl-n": f"execute({executable} create -b {slug} {pause_on_err})+{reload_cmd}",
     }
 
