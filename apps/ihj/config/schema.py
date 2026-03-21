@@ -65,3 +65,42 @@ def build_frontmatter_doc(schema_path, metadata, body_text):
 
     lines.extend(["---", "", body_text])
     return "\n".join(lines)
+
+def generate_hierarchy_schema(board_cfg):
+    """Generates a lean, recursive JSON Schema matching the native hierarchy export."""
+    types = [t["name"] for t in board_cfg.get("types", [])]
+    transitions = board_cfg.get("transitions", [])
+
+    issue_properties = {
+        "key": {
+            "type": "string", 
+            "description": "Existing Jira issue key (e.g., INFRA-123). Omit if creating a new issue."
+        },
+        "type": {"type": "string", "enum": types},
+        "summary": {"type": "string"},
+        "status": {"type": "string", "enum": transitions} if transitions else {"type": "string"},
+        "description": {"type": "string", "description": "Markdown formatted description"}
+    }
+
+    issue_def = {
+        "type": "object",
+        "properties": issue_properties,
+        "required": ["summary", "type"]
+    }
+
+    issue_properties["children"] = {
+        "type": "array",
+        "items": {"$ref": "#/definitions/issue"},
+        "description": "Nested child issues (e.g., sub-tasks under a story, or stories under an epic)."
+    }
+
+    return {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "definitions": {
+            "issue": issue_def
+        },
+        "type": "array",
+        "items": {
+            "$ref": "#/definitions/issue"
+        }
+    }

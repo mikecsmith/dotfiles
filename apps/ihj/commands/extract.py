@@ -96,8 +96,47 @@ def execute_extract(issue_key, cache_dir, cfg, use_toast):
         "  <instruction>",
         f"    {user_prompt}",
         "  </instruction>",
-        "  <issues>",
     ]
+
+    if len(collected_keys) == 1:
+        xml_parts.extend(
+            [
+                "  <output_format>",
+                "    Output your response as a single ihj-compatible Markdown block with YAML frontmatter.",
+                "    You MUST wrap the entire response in markdown code backticks (```markdown).",
+                "    Example:",
+                "    ```markdown",
+                "    ---",
+                '    summary: "The issue title"',
+                '    type: "Task"',
+                f'    parent: "{issue_key}"',
+                "    ---",
+                "    Your detailed markdown description goes here...",
+                "    ```",
+                "  </output_format>",
+            ]
+        )
+    else:
+        from config.schema import generate_hierarchy_schema
+
+        board_cfg = cfg.get("boards", {}).get(board_slug, {})
+        hierarchy_schema = generate_hierarchy_schema(board_cfg)
+        schema_json = json.dumps(hierarchy_schema, indent=2)
+
+        xml_parts.extend(
+            [
+                "  <output_format>",
+                "    Output your response as a structured, pretty printed YAML document.",
+                "    You MUST wrap the output in 4 markdown code backticks (````yaml).",
+                "    The YAML MUST strictly validate against the following JSON Schema:",
+                "    <json_schema>",
+                schema_json,
+                "    </json_schema>",
+                "  </output_format>",
+            ]
+        )
+
+    xml_parts.append("  <issues>")
 
     types_included = set()
 
