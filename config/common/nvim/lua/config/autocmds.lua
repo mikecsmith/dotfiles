@@ -88,3 +88,31 @@ vim.filetype.add({
     ["dot-zshenv"] = "zsh",
   },
 })
+
+local function activate_ihj_otter()
+  if vim.bo.filetype ~= "markdown" then
+    return
+  end
+
+  local lines = vim.api.nvim_buf_get_lines(0, 0, 2, false)
+  if #lines < 2 then
+    return
+  end
+
+  local is_frontmatter = lines[1]:match("^%-%-%-%s*$")
+  local has_schema = lines[2]:match("^#%s*yaml%-language%-server:%s*$schema=")
+
+  if is_frontmatter and has_schema then
+    local ok, otter = pcall(require, "otter")
+    if ok then
+      otter.activate({ "yaml" })
+    else
+      vim.notify("otter.nvim not found - unable to parse yaml frontmatter", vim.log.levels.WARN)
+    end
+  end
+end
+
+vim.api.nvim_create_autocmd({ "BufReadPost", "BufEnter" }, {
+  pattern = "*.md",
+  callback = activate_ihj_otter,
+})
