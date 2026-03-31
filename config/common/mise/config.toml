@@ -18,6 +18,7 @@ quarkus = 'latest'
 scala = 'latest'
 terraform = 'latest'
 "npm:spectral-language-server" = "latest"
+"npm:ctx7" = "latest"
 "go:github.com/rasros/lx/cmd/lx" = "latest"
 
 [settings]
