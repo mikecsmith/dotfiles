@@ -105,12 +105,6 @@ if [[ -f ~/.zsh_secrets ]]; then
 fi
 
 # ============================================================================
-# ZSH Keybindings
-# ============================================================================
-
-bindkey "^W" backward-kill-word
-
-# ============================================================================
 # External Tool Initialization
 # ============================================================================
 
@@ -198,8 +192,12 @@ fi
 if [[ -n "$BREW_PREFIX" ]]; then
   local zvm="$BREW_PREFIX/opt/zsh-vi-mode/share/zsh-vi-mode/zsh-vi-mode.plugin.zsh"
   if [[ -f "$zvm" ]]; then
+    ZVM_VI_EDITOR=nvim
+    ZVM_VI_SURROUND_BINDKEY=s-prefix
+    ZVM_SYSTEM_CLIPBOARD_ENABLED=true
     source "$zvm"
     zvm_after_init_commands+=(
+      'bindkey "^W" backward-kill-word'
       'bindkey "^[[A" history-beginning-search-backward'
       'bindkey "^[[B" history-beginning-search-forward'
     )
