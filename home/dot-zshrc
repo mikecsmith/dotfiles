@@ -37,6 +37,14 @@ setopt NO_BEEP    # Disable audible bell
 setopt CHECK_JOBS # Warn if there are background jobs when exiting
 
 # ============================================================================
+# LS_COLORS (must be set before completion system references it)
+# ============================================================================
+
+if has vivid; then
+  export LS_COLORS="$(vivid generate tokyonight-moon)"
+fi
+
+# ============================================================================
 # ZSH Completion System Setup
 # ============================================================================
 
@@ -48,8 +56,7 @@ if [[ -n "$BREW_PREFIX" ]]; then
   compinit -d "${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompdump"
   zstyle ':completion:*' menu select
   zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
-  local color_style='(s.:.)'
-  zstyle ':completion:*' list-colors "${color_style}${LS_COLORS}"
+  zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
 fi
 
 # ============================================================================
@@ -58,14 +65,13 @@ fi
 
 mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/zsh"
 export HISTFILE="${XDG_DATA_HOME:-$HOME/.local/share}/zsh/.zsh_history"
-export HISTIGNORE="ls:cd:cd -:pwd:exit:date:* --help"
+export HISTORY_IGNORE="(ls|cd|cd -|pwd|exit|date|* --help)"
 export HISTSIZE=10000
 export SAVEHIST=10000
 
 setopt HIST_IGNORE_DUPS
 setopt HIST_FIND_NO_DUPS
 setopt HIST_IGNORE_SPACE
-setopt INC_APPEND_HISTORY
 setopt SHARE_HISTORY
 setopt EXTENDED_HISTORY
 
@@ -89,10 +95,6 @@ export PATH="$PATH:$HOME/.platformio/penv/bin"
 # ============================================================================
 # Environment Variables
 # ============================================================================
-
-if has vivid; then
-  export LS_COLORS="$(vivid generate tokyonight-moon)"
-fi
 
 export CLICOLOR=1
 export EDITOR="nvim"
@@ -124,10 +126,6 @@ fi
 
 if has kind; then
   eval "$(kind completion zsh)"
-fi
-
-if has nvim; then
-  alias rg="rg --color=always"
 fi
 
 if has kubectl; then
@@ -182,7 +180,6 @@ fi
 
 if has nvim; then
   alias rg="rg --color=always"
-
   vi() {
     if [[ $# -gt 0 ]]; then
       nvim "$@"
@@ -192,24 +189,32 @@ if has nvim; then
       fzf_output=$(fd --hidden --exclude .git --exclude node_modules --color=always | fzf --height 50% --reverse --ansi -m --preview 'if [ -d {} ]; then eza --tree --level=1 --color=always --group-directories-first {}; else bat --color=always --style=numbers --line-range=:500 {}; fi' --preview-window=right:50%:border-left)
 
       if [[ -n "$fzf_output" ]]; then
-        # Create a local variable to hold the Zsh 'split-by-newline' flag
-        eval "nvim \"\${(@f)fzf_output}\"" </dev/tty
+        nvim "${(@f)fzf_output}" </dev/tty
       fi
     fi
   }
 fi
 
 if [[ -n "$BREW_PREFIX" ]]; then
-  source "$BREW_PREFIX/opt/zsh-vi-mode/share/zsh-vi-mode/zsh-vi-mode.plugin.zsh"
-  zvm_after_init_commands+=(
-    'bindkey "^[[A" history-beginning-search-backward'
-    'bindkey "^[[B" history-beginning-search-forward'
-  )
+  local zvm="$BREW_PREFIX/opt/zsh-vi-mode/share/zsh-vi-mode/zsh-vi-mode.plugin.zsh"
+  if [[ -f "$zvm" ]]; then
+    source "$zvm"
+    zvm_after_init_commands+=(
+      'bindkey "^[[A" history-beginning-search-backward'
+      'bindkey "^[[B" history-beginning-search-forward'
+    )
+  fi
 
-  source "$BREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
-  ZSH_AUTOSUGGEST_CLEAR_WIDGETS=(accept-line copy-earlier-word)
+  local zas="$BREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+  if [[ -f "$zas" ]]; then
+    source "$zas"
+    ZSH_AUTOSUGGEST_CLEAR_WIDGETS=(accept-line copy-earlier-word)
+  fi
 
-  source "$BREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+  local zsh="$BREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+  if [[ -f "$zsh" ]]; then
+    source "$zsh"
+  fi
 fi
 
 # Keep these below zsh-syntax-highlighting
