@@ -106,11 +106,6 @@ return {
                 { "kind_icon" },
                 { "label" },
               },
-              components = {
-                label = {
-                  width = { min = 10, max = 30, fill = true },
-                },
-              },
             },
           },
         },
