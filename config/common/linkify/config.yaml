@@ -1,0 +1,21 @@
+# linkify configuration
+# Wraps file:line references in terminal output with OSC8 hyperlinks.
+#
+# Usage:
+#   go test ./... 2>&1 | linkify
+#   pnpm test 2>&1 | linkify
+#
+# URL template placeholders: {file}, {line}, {col}, {pid}
+# {pid} = the shell PID where linkify ran — used to find the correct kitty window
+#
+# Schemes:
+#   editor:// — custom scheme handled by EditorOpen.app → linkify --open → nvim
+#               Works in any terminal (kitty, iTerm2, WezTerm, etc.)
+#   vscode:// — opens directly in VS Code
+#   file://   — handled by OS (usually opens in Finder/default app)
+url_template: "editor://open?file={file}&line={line}&col={col}&pid={pid}"
+
+# Additional file extensions to recognize beyond the built-in list.
+# extra_extensions:
+#   - ".prisma"
+#   - ".astro"
