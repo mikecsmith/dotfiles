@@ -13,7 +13,7 @@ return {
           copilot = {
             name = "copilot",
             module = "blink-copilot",
-            score_offset = 100,
+            score_offset = 10,
             async = true,
           },
         },
@@ -24,11 +24,21 @@ return {
         ["<C-space>"] = { "show", "show_documentation", "hide_documentation" },
         ["<C-e>"] = { "hide", "fallback" },
 
-        -- VS Code: Accept with Enter
-        ["<CR>"] = { "accept", "fallback" },
+        -- VS Code: Enter only accepts if you've actively selected an item
+        ["<CR>"] = { "select_and_accept", "fallback" },
 
-        -- VS Code: Tab accepts if menu open, otherwise jumps snippet, otherwise indents
-        ["<Tab>"] = { "select_and_accept", "snippet_forward", "fallback" },
+        -- VS Code: In a snippet, Tab jumps to next placeholder. Otherwise accepts completion.
+        ["<Tab>"] = {
+          function(cmp)
+            if cmp.snippet_active() then
+              return cmp.accept()
+            else
+              return cmp.select_and_accept()
+            end
+          end,
+          "snippet_forward",
+          "fallback",
+        },
         ["<S-Tab>"] = { "snippet_backward", "fallback" },
 
         -- Standard navigation
@@ -43,6 +53,17 @@ return {
       },
 
       completion = {
+        -- VS Code: Auto-insert brackets after function completions
+        accept = {
+          auto_brackets = { enabled = true },
+        },
+
+        -- VS Code: Keep completions available inside snippet placeholders
+        trigger = {
+          prefetch_on_insert = true,
+          show_in_snippet = true,
+        },
+
         -- VS Code: "Ghost text" allows you to see the completion before accepting
         ghost_text = { enabled = true },
 
@@ -55,12 +76,45 @@ return {
           },
         },
 
+        menu = {
+          scrollbar = true,
+          draw = {
+            treesitter = { "lsp" },
+            columns = {
+              { "kind_icon" },
+              { "label" },
+            },
+          },
+        },
+
         -- VS Code: Documentation appears automatically
-        documentation = { auto_show = true, auto_show_delay_ms = 500 },
+        documentation = {
+          auto_show = true,
+          auto_show_delay_ms = 100,
+        },
       },
 
-      -- VS Code: Signature help (parameter hints) pop up automatically
       signature = { enabled = true },
+
+      -- Cmdline: compact layout with fixed-width label
+      cmdline = {
+        completion = {
+          menu = {
+            min_width = 25,
+            draw = {
+              columns = {
+                { "kind_icon" },
+                { "label" },
+              },
+              components = {
+                label = {
+                  width = { min = 10, max = 30, fill = true },
+                },
+              },
+            },
+          },
+        },
+      },
     },
   },
 }

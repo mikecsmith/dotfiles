@@ -91,4 +91,49 @@ return {
       },
     },
   },
+  {
+    "messages-float",
+    virtual = true,
+    keys = {
+      {
+        "<leader>N",
+        function()
+          local messages = vim.api.nvim_exec2("messages", { output = true }).output
+          local lines = vim.split(messages, "\n")
+
+          local buf = vim.api.nvim_create_buf(false, true)
+          vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+          vim.bo[buf].modifiable = false
+          vim.bo[buf].bufhidden = "wipe"
+
+          local width = math.floor(vim.o.columns * 0.8)
+          local height = math.floor(vim.o.lines * 0.6)
+          local row = math.floor((vim.o.lines - height) / 2)
+          local col = math.floor((vim.o.columns - width) / 2)
+
+          local win = vim.api.nvim_open_win(buf, true, {
+            relative = "editor",
+            row = row,
+            col = col,
+            width = width,
+            height = height,
+            style = "minimal",
+            title = " Messages ",
+            title_pos = "center",
+          })
+
+          vim.api.nvim_win_set_cursor(win, { #lines, 0 })
+
+          local close = function()
+            if vim.api.nvim_win_is_valid(win) then
+              vim.api.nvim_win_close(win, true)
+            end
+          end
+          vim.keymap.set("n", "q", close, { buffer = buf, nowait = true })
+          vim.keymap.set("n", "<Esc>", close, { buffer = buf, nowait = true })
+        end,
+        desc = "Messages",
+      },
+    },
+  },
 }
