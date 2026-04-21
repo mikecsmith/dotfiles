@@ -49,6 +49,9 @@ stow $DRY_RUN --dotfiles -v "$MODE" -t "$HOME" home
 echo "$ACTION_TEXT bin..."
 stow $DRY_RUN -v "$MODE" -t "$HOME/.local/bin" bin
 
+echo "$ACTION_TEXT claude..."
+stow $DRY_RUN -v "$MODE" -t "$HOME/.claude" claude
+
 IHJ_LINK="$HOME/.local/bin/ihj"
 if [[ "$MODE" == "-D" ]]; then
   [[ -L "$IHJ_LINK" ]] && [[ -z "$DRY_RUN" ]] && rm "$IHJ_LINK"

@@ -4,6 +4,7 @@ return {
   {
     "folke/snacks.nvim",
     opts = {
+      explorer = { replace_netrw = false },
       dashboard = {
         preset = {
           header = [[
