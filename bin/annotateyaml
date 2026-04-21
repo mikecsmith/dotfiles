@@ -1,127 +1,179 @@
-#!/usr/bin/env python3
+#!/usr/bin/env bash
+# annotateyaml — prepend a `yaml-language-server: $schema=...` modeline
+# to each document in one or more multi-doc Kubernetes YAML files so
+# VS Code's YAML extension validates them.
+#
+# Schemas resolve from a local directory first (default: ./schemas
+# next to this script), then fall back to datreeio's CRDs-catalog.
+# An existing schema modeline on a document is replaced rather than
+# duplicated.
+#
+# Usage: annotateyaml [--schemas-dir DIR] FILE [FILE...]
+#
+# Requires: yq (v4), curl, perl.
 
-# vim: set syntax=python:
+set -euo pipefail
 
-import argparse
-import os
-import time
-import requests
-import yaml
-import glob
-import sys
-from typing import Dict, List
+BASE_URL="https://datreeio.github.io/CRDs-catalog/"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/datree_crds_catalog"
+INDEX_FILE="$CACHE_DIR/index.yaml"
+INDEX_MAX_AGE_DAYS=7
 
-BASE_URL = "https://datreeio.github.io/CRDs-catalog/"
-CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "datree_crds_catalog")
-INDEX_FILENAME="index.yaml"
-INDEX_FILE_MAX_AGE_DAYS = 7
-INDEX_FILEPATH = os.path.join(CACHE_DIR, INDEX_FILENAME)
-SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
-DEFAULT_LOCAL_SCHEMAS_DIR = os.path.join(SCRIPT_DIR, "schemas")
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_LOCAL_SCHEMAS_DIR="$SCRIPT_DIR/schemas"
 
-def download_index_yaml():
-    os.makedirs(CACHE_DIR, exist_ok=True)
+die() { printf 'annotateyaml: %s\n' "$*" >&2; exit 1; }
 
-    do_download = True
-    if os.path.isfile(INDEX_FILEPATH):
-      mtime = os.path.getmtime(INDEX_FILEPATH)
-      if (time.time() - mtime) / (60 * 60 * 24) < INDEX_FILE_MAX_AGE_DAYS:
-        do_download = False
+for cmd in yq curl perl; do
+  command -v "$cmd" >/dev/null || die "$cmd is required"
+done
 
-    if do_download:
-        url = BASE_URL + INDEX_FILENAME
-        print(f"Downloading {url} to {INDEX_FILEPATH}...")
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        with open(INDEX_FILEPATH, 'wb') as f:
-            f.write(response.content)
+schemas_dir="$DEFAULT_LOCAL_SCHEMAS_DIR"
+files=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --schemas-dir)   schemas_dir="$2"; shift 2 ;;
+    --schemas-dir=*) schemas_dir="${1#*=}"; shift ;;
+    -h|--help)
+      sed -n '2,12p' "$0" | sed 's/^# \?//'
+      exit 0 ;;
+    --) shift; files+=("$@"); break ;;
+    -*) die "unknown option: $1" ;;
+    *)  files+=("$1"); shift ;;
+  esac
+done
 
-def load_index() -> Dict[str, List[Dict[str, str]]]:
-    with open(INDEX_FILEPATH, 'r') as f:
-        return yaml.safe_load(f)
+[[ ${#files[@]} -gt 0 ]] || die "no input files"
 
+# Refresh the cached datreeio index if missing or older than the TTL.
+download_index() {
+  mkdir -p "$CACHE_DIR"
+  if [[ -f "$INDEX_FILE" ]]; then
+    local mtime now age
+    mtime=$(stat -f %m "$INDEX_FILE" 2>/dev/null || stat -c %Y "$INDEX_FILE")
+    now=$(date +%s)
+    age=$(( (now - mtime) / 86400 ))
+    (( age < INDEX_MAX_AGE_DAYS )) && return
+  fi
+  printf 'Downloading %sindex.yaml...\n' "$BASE_URL" >&2
+  curl -fsSL -o "$INDEX_FILE" "${BASE_URL}index.yaml"
+}
 
-def find_schema_url(api_version: str, kind: str, index_data: Dict[str, List[Dict[str, str]]], local_schemas_dir: str = None) -> str | None:
-    api_version_lower = api_version.lower()
-    kind_lower = kind.lower()
-    
-    schemas_dir = local_schemas_dir or DEFAULT_LOCAL_SCHEMAS_DIR
+# Resolve a schema URL (or relative local path) for an apiVersion+kind.
+# Args: <api_version> <kind> <yaml_dir>
+# Echoes the URL/path on stdout, or nothing if no match exists.
+find_schema() {
+  local api_version="$1" kind="$2" yaml_dir="$3"
+  local av_lc kind_lc group version
+  av_lc=$(printf '%s' "$api_version" | tr '[:upper:]' '[:lower:]')
+  kind_lc=$(printf '%s' "$kind"        | tr '[:upper:]' '[:lower:]')
+  if [[ "$av_lc" == */* ]]; then
+    group="${av_lc%/*}"
+    version="${av_lc#*/}"
+  else
+    group="$av_lc"
+    version=""
+  fi
 
-    # First check for schemas in the configured directory
-    if os.path.isdir(schemas_dir):
-        print(f"Looking for schemas in {schemas_dir}...")
+  # Local schemas directory takes precedence over the online catalog.
+  if [[ -d "$schemas_dir" ]]; then
+    local local_path="$schemas_dir/$group/${kind_lc}_${version}.json"
+    if [[ -f "$local_path" ]]; then
+      # BSD realpath has no --relative-to; perl's File::Spec is
+      # available everywhere bash is and handles cross-platform paths
+      # without dragging in coreutils.
+      perl -MFile::Spec -e 'print File::Spec->abs2rel($ARGV[0], $ARGV[1])' \
+        "$local_path" "$yaml_dir"
+      return
+    fi
+  fi
 
-        
-        # Extract group from apiVersion (before the '/')
-        group = api_version_lower.split('/')[0] if '/' in api_version_lower else api_version_lower
-        
-        # Extract version part (after the '/')
-        version = api_version_lower.split('/')[1] if '/' in api_version_lower else ''
-        
-        # Build expected schema path: schemas/<group>/<kind>_<version>.json
-        group_dir = os.path.join(schemas_dir, group)
-        schema_filename = f"{kind_lower}_{version}.json"
-        schema_path = os.path.join(group_dir, schema_filename)
-        
-        if os.path.isfile(schema_path):
-            print(f"Found local schema: {schema_path}")
-            return os.path.abspath(schema_path)
-    
-    # Fall back to online catalog
-    for _, entries in index_data.items():
-        for entry in entries:
-            if entry.get("apiVersion", "").lower() == api_version_lower and entry.get("kind", "").lower() == kind_lower:
-                filename = entry.get("filename")
-                if filename:
-                    print(f"Found online schema: {BASE_URL + filename}")
-                    return BASE_URL + filename
-    print(f"Schema not found for apiVersion={api_version} kind={kind}.")
-    return None
+  # Online catalog: walk the index, match on (apiVersion, kind), grab
+  # the filename. The index is grouped by API group at the top level,
+  # so we flatten with `.[] | .[]` first.
+  local filename
+  filename=$(AV="$av_lc" K="$kind_lc" yq '
+    [.[] | .[]
+      | select((.apiVersion | downcase) == strenv(AV)
+            and (.kind       | downcase) == strenv(K))
+      | .filename] | .[0] // ""
+  ' "$INDEX_FILE")
+  if [[ -n "$filename" && "$filename" != "null" ]]; then
+    printf '%s%s' "$BASE_URL" "$filename"
+  fi
+  # Always return success — an empty stdout signals "no schema" to
+  # the caller. Returning non-zero from a function called inside a
+  # command substitution would trip `set -e` and silently abort.
+  return 0
+}
 
-def annotate_file(file_path: str, index_data: Dict[str, List[Dict[str, str]]], schemas_dir: str = None):
-    docs = []
-    with open(file_path, 'r') as f:
-        content = f.read()
-    yaml_file_dir = os.path.dirname(os.path.abspath(file_path))
-    
-    for doc in content.split("---"):
-        doc = doc.strip()
-        if not doc:
-            continue
-        data = list(yaml.safe_load_all(doc))[0] if doc else {}
-        api_version = data.get("apiVersion")
-        kind = data.get("kind")
+# Replace (or insert) the schema modeline on a single document.
+#
+# Two yq quirks make this expression less obvious than it should be:
+#
+#   1. The "head comment" of a multi-doc YAML *document* is actually
+#      stored on the head_comment of the FIRST KEY of the doc's root
+#      mapping — not on the document node. Reading or writing
+#      `headComment` on the document itself returns/persists nothing.
+#      We resolve the first key with `keys | .[0]` so we don't bake in
+#      a `apiVersion` assumption.
+#
+#   2. `headComment` evaluated inside `with(select(...); ...)` returns
+#      the matched node, not its head comment string. To strip an
+#      existing schema modeline before re-adding one we must capture
+#      the comment in a variable BEFORE the assignment.
+#
+# Args: <doc_index> <file> <schema_url>
+annotate_doc() {
+  local di="$1" file="$2" url="$3"
+  DI="$di" URL="$url" yq -i '
+    (select(documentIndex == (env(DI) | tonumber)) | keys | .[0]) as $k |
+    (select(documentIndex == (env(DI) | tonumber)) | .[$k] | key | headComment) as $hc |
+    (select(documentIndex == (env(DI) | tonumber)) | .[$k] | key) head_comment = (
+      [
+        "yaml-language-server: $schema=" + strenv(URL),
+        ($hc
+          | split("\n")
+          | map(select(test("yaml-language-server:.*schema") | not))
+          | join("\n"))
+      ]
+      | map(select(. != ""))
+      | join("\n")
+    )
+  ' "$file"
+}
 
-        lines = doc.splitlines()
-        # Remove any existing schema comment
-        lines = [ln for ln in lines if not ln.strip().startswith("# yaml-language-server: $schema")]
+annotate_file() {
+  local file="$1"
+  local yaml_dir
+  yaml_dir=$(cd "$(dirname "$file")" && pwd)
 
-        if api_version and kind:
-            schema_url = find_schema_url(api_version, kind, index_data, schemas_dir)
-            if schema_url:
-                # If schema URL is a local path, make it relative to the YAML file
-                if os.path.isfile(schema_url) and not schema_url.startswith(('http://', 'https://')):
-                    rel_path = os.path.relpath(schema_url, yaml_file_dir)
-                    print(f"Converting absolute schema path '{schema_url}' to relative path '{rel_path}' (from '{yaml_file_dir}')")
-                    schema_url = rel_path
-                lines.insert(0, f"# yaml-language-server: $schema={schema_url}")
-        docs.append("\n".join(lines))
+  # eval-all collects every input document so we can emit one
+  # pipe-delimited line per doc — easier to parse than yq's default
+  # multi-doc scalar output, which interleaves `---` separators.
+  local meta
+  meta=$(yq ea '
+    [. | (documentIndex | tostring)
+       + "|" + (.apiVersion // "")
+       + "|" + (.kind // "")]
+    | .[]
+  ' "$file")
 
-    with open(file_path, 'w') as f:
-        f.write("---\n")
-        f.write("\n---\n".join(docs) + "\n")
+  local di api_version kind url line
+  while IFS='|' read -r di api_version kind; do
+    [[ -z "$api_version" || -z "$kind" ]] && continue
+    url=$(find_schema "$api_version" "$kind" "$yaml_dir")
+    if [[ -z "$url" ]]; then
+      printf 'annotateyaml: no schema for %s %s in %s (doc %s)\n' \
+        "$api_version" "$kind" "$file" "$di" >&2
+      continue
+    fi
+    annotate_doc "$di" "$file" "$url"
+  done <<< "$meta"
+}
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("yaml_files", nargs="+", help="YAML files to annotate")
-    parser.add_argument("--schemas-dir", help=f"Directory containing schema files (default: {DEFAULT_LOCAL_SCHEMAS_DIR})")
-    args = parser.parse_args()
-
-    download_index_yaml()
-    index_data = load_index()
-
-    for yf in args.yaml_files:
-        annotate_file(yf, index_data, args.schemas_dir)
-
-if __name__ == "__main__":
-    main()
+download_index
+for f in "${files[@]}"; do
+  [[ -f "$f" ]] || die "not a file: $f"
+  annotate_file "$f"
+done
