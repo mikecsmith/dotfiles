@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/haxe-language-server"
+BIN_DIR="${HOME}/.local/bin"
+
+if [[ -f "$INSTALL_DIR/bin/server.js" ]]; then
+  echo "haxe-language-server already installed at $INSTALL_DIR"
+  echo "To reinstall, run: rm -rf $INSTALL_DIR && $0"
+  exit 0
+fi
+
+if ! command -v node &>/dev/null; then
+  echo "error: node is required (install via mise: mise use -g node)" >&2
+  exit 1
+fi
+
+echo "Cloning haxe-language-server..."
+git clone --depth 1 https://github.com/vshaxe/haxe-language-server "$INSTALL_DIR"
+
+cd "$INSTALL_DIR"
+echo "Installing dependencies..."
+npm ci
+
+echo "Building language server..."
+npx lix run vshaxe-build -t language-server
+
+if [[ ! -f bin/server.js ]]; then
+  echo "error: build failed — bin/server.js not found" >&2
+  exit 1
+fi
+
+# Create wrapper script
+mkdir -p "$BIN_DIR"
+cat > "$BIN_DIR/haxe-language-server" <<'WRAPPER'
+#!/usr/bin/env bash
+exec node "${XDG_DATA_HOME:-$HOME/.local/share}/haxe-language-server/bin/server.js" "$@"
+WRAPPER
+chmod +x "$BIN_DIR/haxe-language-server"
+
+echo "Installed haxe-language-server to $BIN_DIR/haxe-language-server"
