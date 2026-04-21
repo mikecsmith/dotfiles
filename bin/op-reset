@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Kill all 1Password processes and clean up stale IPC sockets.
+# Useful when the CLI hangs waiting for biometric auth that never
+# surfaces — usually caused by a stale op daemon or a dead IPC
+# socket between the CLI and the desktop app.
+#
+# After running this, reopen 1Password from the dock.
+set -euo pipefail
+
+echo "Killing 1Password processes..."
+pkill -9 -f "1Password" 2>/dev/null || true
+pkill -9 -f "op daemon" 2>/dev/null || true
+sleep 1
+
+remaining=$(ps aux | grep -i "1password\|op daemon" | grep -v grep | wc -l | tr -d ' ')
+if [ "$remaining" -gt 0 ]; then
+  echo "Force-killing $remaining stubborn processes..."
+  ps aux | grep -i "1password\|op daemon" | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null || true
+fi
+
+# Clean up stale IPC sockets (keep last 24h)
+sock_dir="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t"
+if [ -d "$sock_dir" ]; then
+  stale=$(find "$sock_dir" -type s -not -newermt "24 hours ago" | wc -l | tr -d ' ')
+  if [ "$stale" -gt 0 ]; then
+    echo "Removing $stale stale IPC sockets..."
+    find "$sock_dir" -type s -not -newermt "24 hours ago" -delete
+  fi
+fi
+
+echo "Done. Reopen 1Password from the dock."

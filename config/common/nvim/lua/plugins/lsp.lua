@@ -8,6 +8,9 @@ return {
           settings = {
             gopls = {
               linksInHover = false,
+              analyses = {
+                minmax = false,
+              },
             },
           },
         },
