@@ -100,7 +100,6 @@ return {
       cmdline = {
         completion = {
           menu = {
-            min_width = 25,
             draw = {
               columns = {
                 { "kind_icon" },
