@@ -5,21 +5,11 @@ vim.api.nvim_create_autocmd("FileType", {
   group = vim.api.nvim_create_augroup("fathom_quarto", { clear = true }),
   pattern = "quarto",
   callback = function()
-    -- Activate otter for all languages, with all features using a Quarto specific treesitter query
-    local tsquery = [[
-      (fenced_code_block
-      (info_string
-        (language) @_lang
-      ) @info
-        (#match? @info "{")
-      (code_fence_content) @content (#offset! @content)
-      )
-      ((html_block) @html @combined)
-
-      ((minus_metadata) @yaml (#offset! @yaml 1 0 -1 0))
-      ((plus_metadata) @toml (#offset! @toml 1 0 -1 0))
-    ]]
-    require("otter").activate(nil, true, true, tsquery)
+    -- Activate otter for all languages. Since otter.nvim 2.14 (commit ddcd2ae,
+    -- "detect nested injections") the tsquery argument is accepted but no
+    -- longer consumed — otter relies on Neovim's native injection trees. Quarto's
+    -- `{lang}` fences are handled by after/queries/markdown/injections.scm.
+    require("otter").activate(nil, true, true)
 
     -- Overwrite the LazyVim keybindings to make <leader>cf work like <leader>cF
     vim.keymap.set({ "n", "v" }, "<leader>cf", function()

@@ -7,7 +7,7 @@ return {
       servers = {
         marksman = {
           filetypes = { "markdown", "markdown.mdx", "quarto" },
-          root_dir = require("lspconfig.util").root_pattern(".git", ".marksman.toml", "_quarto.yml"),
+          root_markets = { ".git", ".marksman.toml", "_quarto.yml" },
         },
       },
     },
@@ -37,6 +37,9 @@ return {
     "nvim-treesitter/nvim-treesitter",
     opts = function(_, opts)
       vim.treesitter.language.register("markdown", "quarto")
+      -- Observable JS has no dedicated parser; alias it to javascript so
+      -- treesitter can highlight ```{ojs} blocks in Quarto documents.
+      vim.treesitter.language.register("javascript", "ojs")
       return opts
     end,
   },
