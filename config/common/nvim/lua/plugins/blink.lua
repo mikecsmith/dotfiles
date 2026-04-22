@@ -1,7 +1,6 @@
 return {
   {
     "saghen/blink.cmp",
-    dependencies = { "fang2hou/blink-copilot" },
     build = "cargo build --release",
     opts = {
       sources = {
@@ -10,12 +9,6 @@ return {
         },
         providers = {
           dadbod = { name = "Dadbod", module = "vim_dadbod_completion.blink" },
-          copilot = {
-            name = "copilot",
-            module = "blink-copilot",
-            score_offset = 10,
-            async = true,
-          },
         },
       },
       keymap = {
