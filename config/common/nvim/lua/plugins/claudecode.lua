@@ -22,7 +22,11 @@ local function in_kitty()
   return (vim.env.KITTY_WINDOW_ID or vim.env.KITTY_LISTEN_ON) ~= nil
 end
 
-local function kitten(subcmd, args)
+-- Fire a `kitten @` subcommand asynchronously. `callback(stdout, rc)` runs on
+-- the main loop; omit it for fire-and-forget. Async matters because these
+-- calls sit on the hot path of every toggle/send — a stalled Kitty socket
+-- would otherwise freeze nvim's main thread.
+local function kitten(subcmd, args, callback)
   local cmd = { "kitten", "@" }
   local listen = vim.env.KITTY_LISTEN_ON
   if listen and listen ~= "" then
@@ -33,35 +37,56 @@ local function kitten(subcmd, args)
   for _, a in ipairs(args or {}) do
     table.insert(cmd, a)
   end
-  local result = vim.system(cmd, { text = true }):wait()
-  return result.stdout or "", result.code
+  local on_exit = callback
+      and function(result)
+        vim.schedule(function()
+          callback(result.stdout or "", result.code)
+        end)
+      end
+    or nil
+  vim.system(cmd, { text = true }, on_exit)
 end
 
-local function window_exists()
-  local out, rc = kitten("ls", { "--match", claude_match() })
-  if rc ~= 0 then return false end
-  return vim.trim(out) ~= "[]"
-end
-
-local function current_layout()
-  local wid = vim.env.KITTY_WINDOW_ID
-  if not wid then return nil end
-  local out, rc = kitten("ls", { "--match", "id:" .. wid })
-  if rc ~= 0 then return nil end
-  local ok, data = pcall(vim.json.decode, out)
-  if not ok or type(data) ~= "table" or not data[1] then return nil end
-  local my_id = tonumber(wid)
-  for _, tab in ipairs(data[1].tabs or {}) do
-    for _, win in ipairs(tab.windows or {}) do
-      if win.id == my_id then return tab.layout end
+local function window_exists(cb)
+  kitten("ls", { "--match", claude_match() }, function(out, rc)
+    if rc ~= 0 then
+      return cb(false)
     end
+    cb(vim.trim(out) ~= "[]")
+  end)
+end
+
+local function current_layout(cb)
+  local wid = vim.env.KITTY_WINDOW_ID
+  if not wid then
+    return cb(nil)
   end
-  return nil
+  kitten("ls", { "--match", "id:" .. wid }, function(out, rc)
+    if rc ~= 0 then
+      return cb(nil)
+    end
+    local ok, data = pcall(vim.json.decode, out)
+    if not ok or type(data) ~= "table" or not data[1] then
+      return cb(nil)
+    end
+    local my_id = tonumber(wid)
+    for _, tab in ipairs(data[1].tabs or {}) do
+      for _, win in ipairs(tab.windows or {}) do
+        if win.id == my_id then
+          return cb(tab.layout)
+        end
+      end
+    end
+    cb(nil)
+  end)
 end
 
 -- Last args passed to open(), so ensure_visible() (argless API) can relaunch
 -- if the pane was manually closed between sends.
 local cached_open_args = nil
+-- Serialise open() so rapid re-invocations don't double-launch while an
+-- earlier existence check / launch is still in flight.
+local opening = false
 
 local kitty_provider
 kitty_provider = {
@@ -69,75 +94,98 @@ kitty_provider = {
 
   open = function(cmd_string, env_table, config, focus)
     cached_open_args = { cmd_string, env_table, config }
-    if focus == nil then focus = true end
-    if window_exists() then
-      if focus then
-        kitten("focus-window", { "--match", claude_match() })
-      end
+    if focus == nil then
+      focus = true
+    end
+    if opening then
       return
     end
-    local args = {
-      "--type=window",
-      "--location=vsplit",
-      "--cwd=" .. vim.fn.getcwd(),
-      "--title=" .. CLAUDE_TITLE,
-      "--bias=" .. math.floor((config.split_width_percentage or 0.38) * 100),
-      -- Copy env from the calling nvim window. Without this, the new Kitty
-      -- window inherits Kitty.app's launch env (no zshrc sourced) — PATH loses
-      -- ~/.local/bin, LANG/LC_ALL may be C, Nerd Font glyphs render as tofu.
-      "--copy-env",
-    }
-    if not focus then
-      table.insert(args, "--keep-focus")
-    end
-    -- MCP env from claudecode.nvim overrides copied env per-key
-    for k, v in pairs(env_table or {}) do
-      table.insert(args, "--env")
-      table.insert(args, k .. "=" .. tostring(v))
-    end
-    table.insert(args, "sh")
-    table.insert(args, "-c")
-    table.insert(args, cmd_string)
-    kitten("launch", args)
+    opening = true
+    window_exists(function(exists)
+      if exists then
+        opening = false
+        if focus then
+          kitten("focus-window", { "--match", claude_match() })
+        end
+        return
+      end
+      local args = {
+        "--type=window",
+        "--location=vsplit",
+        "--cwd=" .. vim.fn.getcwd(),
+        "--title=" .. CLAUDE_TITLE,
+        "--bias=" .. math.floor((config.split_width_percentage or 0.38) * 100),
+        -- Copy env from the calling nvim window. Without this, the new Kitty
+        -- window inherits Kitty.app's launch env (no zshrc sourced) — PATH loses
+        -- ~/.local/bin, LANG/LC_ALL may be C, Nerd Font glyphs render as tofu.
+        "--copy-env",
+      }
+      if not focus then
+        table.insert(args, "--keep-focus")
+      end
+      -- MCP env from claudecode.nvim overrides copied env per-key
+      for k, v in pairs(env_table or {}) do
+        table.insert(args, "--env")
+        table.insert(args, k .. "=" .. tostring(v))
+      end
+      table.insert(args, "sh")
+      table.insert(args, "-c")
+      table.insert(args, cmd_string)
+      kitten("launch", args, function()
+        opening = false
+      end)
+    end)
   end,
 
   close = function()
-    if window_exists() then
-      kitten("close-window", { "--match", claude_match() })
-    end
+    window_exists(function(exists)
+      if exists then
+        kitten("close-window", { "--match", claude_match() })
+      end
+    end)
   end,
 
   simple_toggle = function(cmd_string, env_table, config)
-    if window_exists() then
-      kitten("action", { "toggle_layout", "stack" })
-    else
-      kitty_provider.open(cmd_string, env_table, config, true)
-    end
+    window_exists(function(exists)
+      if exists then
+        kitten("action", { "toggle_layout", "stack" })
+      else
+        kitty_provider.open(cmd_string, env_table, config, true)
+      end
+    end)
   end,
 
   focus_toggle = function(cmd_string, env_table, config)
-    if not window_exists() then
-      kitty_provider.open(cmd_string, env_table, config, true)
-    else
-      kitten("focus-window", { "--match", claude_match() })
-    end
+    window_exists(function(exists)
+      if not exists then
+        kitty_provider.open(cmd_string, env_table, config, true)
+      else
+        kitten("focus-window", { "--match", claude_match() })
+      end
+    end)
   end,
 
   -- Called by the plugin on send when focus_after_send=false: ensure the
   -- Claude pane is on screen without stealing focus from nvim.
   ensure_visible = function()
-    if window_exists() then
-      if current_layout() == "stack" then
-        kitten("action", { "toggle_layout", "stack" })
+    window_exists(function(exists)
+      if exists then
+        current_layout(function(layout)
+          if layout == "stack" then
+            kitten("action", { "toggle_layout", "stack" })
+          end
+        end)
+        return
       end
-      return
-    end
-    if cached_open_args then
-      kitty_provider.open(cached_open_args[1], cached_open_args[2], cached_open_args[3], false)
-    end
+      if cached_open_args then
+        kitty_provider.open(cached_open_args[1], cached_open_args[2], cached_open_args[3], false)
+      end
+    end)
   end,
 
-  get_active_bufnr = function() return nil end,
+  get_active_bufnr = function()
+    return nil
+  end,
 
   is_available = function()
     return in_kitty() and vim.fn.executable("kitten") == 1
