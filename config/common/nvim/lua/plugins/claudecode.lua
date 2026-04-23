@@ -1,18 +1,12 @@
 -- Claude Code in an adjacent Kitty pane instead of an embedded snacks terminal.
 -- Requires: kitty with allow_remote_control + listen_on, a `claude` binary on PATH.
 
--- Unique Kitty window title per nvim session. Random suffix so multiple
--- nvim instances in the same Kitty app each own a distinct Claude pane.
--- Title is our only match key — orphans from prior nvim sessions are
--- intentionally left alone for manual cleanup + --resume.
-local function random_suffix()
-  local t = {}
-  for i = 1, 5 do
-    t[i] = string.char(math.random(97, 122))
-  end
-  return table.concat(t)
-end
-local CLAUDE_TITLE = "claude-" .. random_suffix()
+-- Unique Kitty window title per nvim session. PID guarantees uniqueness
+-- across concurrent nvim instances (math.random is unseeded in LuaJIT and
+-- collides on identical startup paths). Title is our only match key —
+-- orphans from prior nvim sessions are intentionally left alone for manual
+-- cleanup + --resume.
+local CLAUDE_TITLE = "claude-" .. vim.fn.getpid()
 
 local function claude_match()
   return "title:" .. CLAUDE_TITLE
@@ -26,6 +20,12 @@ end
 -- the main loop; omit it for fire-and-forget. Async matters because these
 -- calls sit on the hot path of every toggle/send — a stalled Kitty socket
 -- would otherwise freeze nvim's main thread.
+--
+-- Always pass an on_exit to vim.system. Without one the returned SystemObj is
+-- only kept alive by the caller holding a reference; once GC runs, libuv sends
+-- SIGTERM to the subprocess. For fire-and-forget kitten calls the process was
+-- getting killed mid-flight, causing `kitten @ launch` to drop the tail of its
+-- arg list (including our --env flags) before the kitty daemon received them.
 local function kitten(subcmd, args, callback)
   local cmd = { "kitten", "@" }
   local listen = vim.env.KITTY_LISTEN_ON
@@ -37,14 +37,13 @@ local function kitten(subcmd, args, callback)
   for _, a in ipairs(args or {}) do
     table.insert(cmd, a)
   end
-  local on_exit = callback
-      and function(result)
-        vim.schedule(function()
-          callback(result.stdout or "", result.code)
-        end)
-      end
-    or nil
-  vim.system(cmd, { text = true }, on_exit)
+  vim.system(cmd, { text = true }, function(result)
+    if callback then
+      vim.schedule(function()
+        callback(result.stdout or "", result.code)
+      end)
+    end
+  end)
 end
 
 local function window_exists(cb)
@@ -215,7 +214,7 @@ return {
     },
     diff_opts = {
       auto_close_on_accept = true,
-      vertical_split = true,
+      vertical_split = false,
       open_in_current_tab = false,
       keep_terminal_focus = false,
     },
