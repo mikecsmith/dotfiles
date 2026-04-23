@@ -4,6 +4,9 @@ return {
     opts = {
       diagnostics = { virtual_text = { prefix = "icons" } },
       servers = {
+        -- Prevent mason-lspconfig from auto-enabling copilot if the
+        -- copilot-language-server package is (re)installed via Mason.
+        copilot = { enabled = false },
         gopls = {
           settings = {
             gopls = {

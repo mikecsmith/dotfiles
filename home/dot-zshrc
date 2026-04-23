@@ -173,20 +173,8 @@ if has starship; then
 fi
 
 if has nvim; then
-  alias rg="rg --color=always"
-  vi() {
-    if [[ $# -gt 0 ]]; then
-      nvim "$@"
-    else
-
-      local fzf_output
-      fzf_output=$(fd --hidden --exclude .git --exclude node_modules --color=always | fzf --height 50% --reverse --ansi -m --preview 'if [ -d {} ]; then eza --tree --level=1 --color=always --group-directories-first {}; else bat --color=always --style=numbers --line-range=:500 {}; fi' --preview-window=right:50%:border-left)
-
-      if [[ -n "$fzf_output" ]]; then
-        nvim "${(@f)fzf_output}" </dev/tty
-      fi
-    fi
-  }
+  alias rgv="rg --vimgrep"
+  alias vi="nvim"
 fi
 
 if [[ -n "$BREW_PREFIX" ]]; then
