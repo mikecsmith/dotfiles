@@ -54,7 +54,10 @@ vim.api.nvim_create_autocmd("VimEnter", {
     end
     vim.cmd.cd(arg)
     local dir_buf = vim.api.nvim_get_current_buf()
-    Snacks.dashboard()
+    -- win=0 → open in the current window as a normal buffer, not a float.
+    -- Default `Snacks.dashboard()` creates a floating window that overlays the
+    -- editor area, breaking sidebar splits (explorer) and terminal resizes.
+    Snacks.dashboard.open({ win = 0 })
     pcall(vim.api.nvim_buf_delete, dir_buf, { force = true })
   end,
 })
