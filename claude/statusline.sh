@@ -8,12 +8,16 @@
 #   [████░░░░░░] £1.23   repo  branch   ▃ 35%   ◕ 62%
 #
 # Env var overrides:
-#   CLAUDE_STATUSLINE_GBP_RATE   default 0.79   (USD→GBP conversion)
+#   CLAUDE_STATUSLINE_GBP_RATE      default 0.79   (USD→GBP conversion)
+#   CLAUDE_STATUSLINE_HIDE_LIMITS   any non-empty value hides weekly + 5h
+#                                   rate limit segments (e.g. on Enterprise
+#                                   where published limits don't apply).
 
 set -u
 export LC_ALL="${LC_ALL:-en_US.UTF-8}"
 
 GBP_RATE="${CLAUDE_STATUSLINE_GBP_RATE:-0.79}"
+HIDE_LIMITS="${CLAUDE_STATUSLINE_HIDE_LIMITS:-}"
 
 # ── Colours (tokyo-night truecolor) ──────────────────────────────────────────
 C_RESET=$'\e[0m'
@@ -78,7 +82,9 @@ ctx_bar="${C_DIM}[${C_RESET}${bar_fill}${bar_empty}${C_DIM}]${C_RESET}"
 # Muted grey while in-plan; red+bold when either rate limit crosses 100%.
 cost_gbp=$(awk -v u="$cost_usd" -v r="$GBP_RATE" 'BEGIN{printf "%.2f", u*r}')
 over_plan=0
-(( pct_5h >= 100 || pct_week >= 100 )) && over_plan=1
+if [[ -z "$HIDE_LIMITS" ]]; then
+  (( pct_5h >= 100 || pct_week >= 100 )) && over_plan=1
+fi
 if (( over_plan )); then
   cost_seg="${C_RED}${C_BOLD}£${cost_gbp}${C_RESET}"
 else
@@ -164,12 +170,13 @@ fmt_5h() { # 5h — block bar + percentage
   printf '%s%s %d%%%s' "$colour" "${BLOCKS[$bi]}" "$p" "$C_RESET"
 }
 
-week_seg=$(fmt_week "$pct_week")
-five_seg=$(fmt_5h   "$pct_5h")
-
 # ── Assemble (inline, spaces between segments) ─────────────────────────────
 # Order: weekly usage, 5h usage, current-session context bar, cost, folder, branch
-parts=( "$week_seg" "$five_seg" "$ctx_bar" "$cost_seg" )
+parts=()
+if [[ -z "$HIDE_LIMITS" ]]; then
+  parts+=( "$(fmt_week "$pct_week")" "$(fmt_5h "$pct_5h")" )
+fi
+parts+=( "$ctx_bar" "$cost_seg" )
 [[ -n "$proj_seg"   ]] && parts+=( "$proj_seg" )
 [[ -n "$branch_seg" ]] && parts+=( "$branch_seg" )
 
